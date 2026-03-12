@@ -1,5 +1,6 @@
 """Code ingestion pipeline: parse, chunk, and store Python files in ChromaDB."""
 
+import logging
 import os
 import uuid
 from dataclasses import dataclass, field
@@ -8,6 +9,8 @@ from pathlib import Path
 from typing import List, Optional, Callable, Set
 
 import tiktoken
+
+logger = logging.getLogger(__name__)
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser, Node
 
@@ -255,11 +258,13 @@ class IngestionService:
     def ingest_directory(self, directory: str, collection_name: str,
                          progress_callback: Optional[Callable] = None) -> IngestionProgress:
         """Ingest all Python files from a directory into a ChromaDB collection."""
+        logger.info(f"Starting ingestion: directory='{directory}' collection='{collection_name}'")
         collection = self._chroma.get_collection(collection_name)
         progress = IngestionProgress()
 
         py_files = self._discover_python_files(directory)
         progress.total_files = len(py_files)
+        logger.info(f"Discovered {len(py_files)} Python files to process")
 
         buffer: List[Chunk] = []
         batch_size = self._config.batch_size
@@ -291,6 +296,11 @@ class IngestionService:
         progress.is_complete = True
         if progress_callback:
             progress_callback(progress)
+
+        logger.info(
+            f"Ingestion complete: {progress.total_chunks} chunks from "
+            f"{progress.success_count}/{progress.total_files} files"
+        )
 
         return progress
 

@@ -59,6 +59,22 @@ class IngestionConfig:
 
 
 @dataclass
+class ExportConfig:
+    """Configuration for the export service."""
+    default_format: str = "json"
+    supported_formats: tuple = ("json", "csv")
+    max_export_chunks: int = 10000
+
+
+@dataclass
+class DiffConfig:
+    """Configuration for the collection diff service."""
+    similarity_threshold: float = 0.98
+    max_diff_results: int = 50
+    include_modified_by_default: bool = True
+
+
+@dataclass
 class AppConfig:
     """Root application configuration combining all sub-configs."""
     environment: Environment = field(default_factory=lambda: Environment(
@@ -76,6 +92,8 @@ class AppConfig:
     chroma: ChromaConfig = field(default_factory=ChromaConfig)
     search: SearchConfig = field(default_factory=SearchConfig)
     ingestion: IngestionConfig = field(default_factory=IngestionConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
+    diff: DiffConfig = field(default_factory=DiffConfig)
 
     def __post_init__(self):
         self.debug = self.environment == Environment.DEVELOPMENT

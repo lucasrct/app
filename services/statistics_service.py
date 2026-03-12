@@ -2,16 +2,21 @@
 
 Provides detailed code metrics and analytics for collections,
 including line counts, token estimates, complexity scoring,
-chunk size distributions, and code construct detection.
+chunk size distributions, duplicate detection, and code construct detection.
 """
 
+import hashlib
+import logging
 import re
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import List, Dict, Optional, Tuple
 
 import chromadb
+
+logger = logging.getLogger(__name__)
 
 
 class MetricCategory(Enum):
@@ -125,6 +130,8 @@ class CollectionStatistics:
     construct_counts: List[ConstructCount] = field(default_factory=list)
     size_distribution: Optional[SizeDistribution] = None
     top_symbols: List[Dict] = field(default_factory=list)
+    token_stats: Optional[Dict] = None
+    duplicate_groups: List[Dict] = field(default_factory=list)
 
     @property
     def avg_lines_per_file(self) -> float:
@@ -161,6 +168,8 @@ class CollectionStatistics:
             "size_distribution": self.size_distribution.to_dict() if self.size_distribution else None,
             "files": [f.to_dict() for f in self.file_metrics],
             "top_symbols": self.top_symbols,
+            "token_stats": self.token_stats,
+            "duplicates": self.duplicate_groups,
         }
 
 
@@ -325,6 +334,85 @@ class SymbolRanker(MetricComputer):
         return {"top_symbols": ranked[:15]}
 
 
+class TokenEstimator(MetricComputer):
+    """Estimates token usage across chunks.
+
+    Uses a character-based heuristic (chars / 4) to approximate
+    token counts without requiring a tokenizer dependency, then
+    computes per-chunk statistics for cost estimation.
+    """
+
+    CHARS_PER_TOKEN = 4
+
+    def metric_name(self) -> str:
+        return "token_estimation"
+
+    def compute(self, documents: List[str], metadatas: List[Dict]) -> Dict:
+        if not documents:
+            return {"token_stats": None}
+
+        token_counts = [len(doc) // self.CHARS_PER_TOKEN for doc in documents]
+        total = sum(token_counts)
+        mean = total / len(token_counts)
+        sorted_counts = sorted(token_counts)
+        n = len(sorted_counts)
+        median = sorted_counts[n // 2] if n % 2 else (sorted_counts[n // 2 - 1] + sorted_counts[n // 2]) / 2
+
+        return {
+            "token_stats": {
+                "total_estimated_tokens": total,
+                "avg_tokens_per_chunk": round(mean, 1),
+                "median_tokens_per_chunk": median,
+                "min_tokens": sorted_counts[0],
+                "max_tokens": sorted_counts[-1],
+            }
+        }
+
+
+class DuplicateDetector(MetricComputer):
+    """Detects duplicate and near-duplicate chunks.
+
+    Uses content hashing to find exact duplicates. Chunks with
+    identical normalized content are grouped together, which can
+    indicate redundant indexing or overlapping file processing.
+    """
+
+    def metric_name(self) -> str:
+        return "duplicate_detection"
+
+    def compute(self, documents: List[str], metadatas: List[Dict]) -> Dict:
+        hash_to_indices: Dict[str, List[int]] = {}
+
+        for i, doc in enumerate(documents):
+            normalized = doc.strip()
+            content_hash = hashlib.md5(normalized.encode("utf-8")).hexdigest()
+
+            if content_hash not in hash_to_indices:
+                hash_to_indices[content_hash] = []
+            hash_to_indices[content_hash].append(i)
+
+        duplicate_groups = []
+        for content_hash, indices in hash_to_indices.items():
+            if len(indices) < 2:
+                continue
+
+            paths = [metadatas[i].get("path", "unknown") for i in indices]
+            symbols = [metadatas[i].get("symbol", "") for i in indices]
+
+            duplicate_groups.append({
+                "count": len(indices),
+                "paths": list(set(paths)),
+                "symbols": [s for s in set(symbols) if s],
+                "preview": documents[indices[0]][:120],
+            })
+
+        duplicate_groups.sort(key=lambda g: g["count"], reverse=True)
+
+        logger.info(f"Duplicate detection: found {len(duplicate_groups)} groups")
+
+        return {"duplicate_groups": duplicate_groups[:20]}
+
+
 @dataclass
 class StatisticsService:
     """Orchestrates code statistics computation.
@@ -336,6 +424,8 @@ class StatisticsService:
         ConstructDetector(),
         SizeAnalyzer(),
         SymbolRanker(),
+        TokenEstimator(),
+        DuplicateDetector(),
     ])
 
     def compute_statistics(self, collection: chromadb.Collection) -> CollectionStatistics:
@@ -398,5 +488,9 @@ class StatisticsService:
                 stats.size_distribution = computed["distribution"]
             if "top_symbols" in computed:
                 stats.top_symbols = computed["top_symbols"]
+            if "token_stats" in computed:
+                stats.token_stats = computed["token_stats"]
+            if "duplicate_groups" in computed:
+                stats.duplicate_groups = computed["duplicate_groups"]
 
         return stats

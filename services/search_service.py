@@ -1,5 +1,6 @@
 """Search service with semantic and regex strategies."""
 
+import logging
 import re
 import time
 from abc import ABC, abstractmethod
@@ -7,6 +8,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 
 import chromadb
+
+logger = logging.getLogger(__name__)
 
 from models.chunk import Chunk, ChunkMetadata
 from models.search_result import SearchResult, SearchResultSet
@@ -43,6 +46,7 @@ class SemanticSearchStrategy(SearchStrategy):
 
     def search(self, collection: chromadb.Collection, query: str,
                n_results: int = 10, filters: Optional[Dict] = None) -> SearchResultSet:
+        logger.info(f"Semantic search: query='{query[:80]}' n_results={n_results} collection={collection.name}")
         start = time.time()
 
         where_clause = self._build_where_clause(filters) if filters else None
@@ -70,6 +74,8 @@ class SemanticSearchStrategy(SearchStrategy):
                 rank=i + 1,
             )
             results.append(result)
+
+        logger.info(f"Semantic search completed: {len(results)} results in {elapsed_ms:.1f}ms")
 
         return SearchResultSet(
             results=results,
@@ -114,11 +120,13 @@ class RegexSearchStrategy(SearchStrategy):
 
     def search(self, collection: chromadb.Collection, query: str,
                n_results: int = 50, filters: Optional[Dict] = None) -> SearchResultSet:
+        logger.info(f"Regex search: pattern='{query[:80]}' collection={collection.name}")
         start = time.time()
 
         try:
             pattern = re.compile(query, re.MULTILINE)
-        except re.error:
+        except re.error as e:
+            logger.warning(f"Invalid regex pattern: {e}")
             return SearchResultSet(query=query)
 
         # Use ChromaDB's native full-text search with $regex operator.

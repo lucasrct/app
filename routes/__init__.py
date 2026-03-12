@@ -15,6 +15,8 @@ def register_blueprints(app: Flask) -> None:
     from routes.suggestions import suggestions_bp
     from routes.statistics import statistics_bp
     from routes.tutorial import tutorial_bp
+    from routes.export import export_bp
+    from routes.diff import diff_bp
 
     app.register_blueprint(search_bp)
     app.register_blueprint(collections_bp)
@@ -26,3 +28,5 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(suggestions_bp)
     app.register_blueprint(statistics_bp)
     app.register_blueprint(tutorial_bp)
+    app.register_blueprint(export_bp)
+    app.register_blueprint(diff_bp)

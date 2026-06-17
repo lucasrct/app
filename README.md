@@ -1,117 +1,96 @@
-# ChromaDB Code Search UI
+# Code Search App
 
-A Flask web application for searching, browsing, and visualizing Python code using semantic embeddings and ChromaDB. Built as a companion app for the **Context Engineering with Chroma** course.
+A Flask-based web application for indexing, searching, and exploring Python codebases stored in ChromaDB. The app ingests a source directory, splits the code into semantic chunks using Abstract Syntax Trees and token-bounded splitting, and provides a browser UI for semantic and regex search over the resulting collection.
 
-## Purpose
+## Overview
 
-This app serves two roles in the course:
+When you point the app at a source directory, it walks every supported file, parses Python files using tree-sitter to extract function and class definitions as atomic units, and stores each chunk alongside rich metadata (file path, line range, symbol name, chunk type) in a ChromaDB persistent collection. You can then search the indexed codebase using natural-language queries (semantic search via OpenAI embeddings) or regular expressions (full-text filter via ChromaDB's `$regex` operator).
 
-1. **Teaching material** — Students ingest this codebase into ChromaDB using AST-based chunking pipelines they build in the labs. The well-structured Python code (models, services, routes, utils) makes it an ideal target for practicing chunking strategies.
-2. **Interactive tool** — Once ingested, students launch this app to explore their collections, run searches, and see how their chunking and metadata decisions affect retrieval quality.
+The same codebase that powers the app is also a valid target for indexing, which lets you point the ingestion pipeline at the `app/` directory itself and explore its own architecture through the search UI.
 
 ## Features
 
-- **Semantic search** — Natural language queries over code using OpenAI embeddings (`text-embedding-3-small`)
-- **Regex search** — Structural pattern matching across the codebase with analysis and explanation
-- **Collection explorer** — Paginated chunk browser with filters by file path, chunk type, and symbol name
-- **Code statistics** — Construct detection, size distributions, and symbol rankings
-- **Embedding visualizer** — 2D PCA projections of chunk embeddings to explore clustering
-- **Smart suggestions** — Context-aware query suggestions based on collection metadata
-- **Query history and bookmarks** — Persistent search history with color-coded bookmarks
-- **Interactive tutorials** — Guided tours with spotlight overlays for onboarding
-
-## Project Structure
-
-```
-app/
-├── app.py                  # Flask application factory and entry point
-├── config.py               # Dataclass-based configuration (env vars, defaults)
-├── requirements.txt        # Python dependencies
-├── .env.example            # Environment variable template
-│
-├── models/                 # Data models
-│   ├── chunk.py            # Chunk, ChunkMetadata, ChunkType
-│   ├── search_result.py    # SearchResult, SearchResultSet, ResultFormatter
-│   └── query_history.py    # QueryRecord, Bookmark, HistoryManager
-│
-├── routes/                 # Flask blueprints (one per feature)
-│   ├── search.py           # Semantic and regex search endpoints
-│   ├── collections.py      # Collection CRUD and ingestion triggers
-│   ├── explorer.py         # Paginated chunk browsing with filters
-│   ├── similarity.py       # Pairwise similarity matrix computation
-│   ├── history.py          # Query history and bookmarks API
-│   ├── regex_tester.py     # Regex testing and analysis
-│   ├── suggestions.py      # Smart query suggestions
-│   ├── statistics.py       # Code metrics and analytics
-│   ├── visualizer.py       # 2D embedding visualization
-│   └── tutorial.py         # Interactive guided tours
-│
-├── services/               # Business logic layer
-│   ├── chroma_client.py    # ChromaDB connection manager (singleton)
-│   ├── search_service.py   # Search strategies (semantic + regex)
-│   ├── collection_service.py   # Collection management and stats
-│   ├── ingestion_service.py    # AST parsing and code chunking pipeline
-│   ├── similarity_service.py   # Vector similarity computations
-│   ├── statistics_service.py   # Code metrics and analysis
-│   ├── visualization_service.py # PCA and random projection reducers
-│   ├── suggestion_service.py   # Multi-strategy suggestion generator
-│   └── tutorial_service.py     # Tutorial builder and manager
-│
-├── utils/                  # Utilities and helpers
-│   ├── validators.py       # Input validation (queries, paths, regex)
-│   ├── regex_engine.py     # Regex analysis and human-readable explanation
-│   ├── code_parser.py      # Lightweight regex-based Python parser
-│   ├── text_splitter.py    # Token-based text splitting
-│   └── formatters.py       # Display formatting (scores, code, paths)
-│
-├── templates/              # Jinja2 HTML templates
-│   ├── base.html           # Base layout with navbar and tutorial engine
-│   ├── index.html          # Dashboard (collection cards)
-│   ├── search.html         # Search interface
-│   ├── explorer.html       # Chunk browser
-│   └── collection.html     # Collection detail page
-│
-└── static/
-    └── css/style.css       # Custom styles
-```
-
-## Design Patterns
-
-The codebase intentionally demonstrates several software design patterns, making it a richer target for code search exercises:
-
-- **Strategy** — `SearchStrategy`, `SimilarityComputer`, `DimensionReducer`, `SuggestionStrategy`
-- **Singleton** — `ChromaClientManager` for a single DB connection
-- **Factory** — `get_reducer()`, `get_similarity_computer()`, `get_tutorial_builder()`
-- **Builder** — Tutorial builders (`DashboardTutorialBuilder`, `CollectionTutorialBuilder`)
-- **Facade** — `SearchService`, `SuggestionService`, `StatisticsService` wrapping multiple strategies
+- **Semantic search**: Embed a natural-language query and retrieve the most similar code chunks using cosine distance over OpenAI `text-embedding-3-small` vectors.
+- **Regex search**: Filter the collection by a regular expression pattern applied to chunk text. Useful for finding all usages of a specific function, class, or import.
+- **Collection explorer**: Browse all ingested chunks with filters by file path, chunk type (function, class, top-level code), and symbol name.
+- **Embedding visualizer**: Project chunk embeddings into two dimensions using PCA or random projection and explore the resulting scatter plot coloured by file, chunk type, or symbol.
+- **Similarity inspector**: Select any two chunks and compare their cosine similarity score directly.
+- **Code statistics**: View aggregate metrics — chunk count by file, token distribution, top symbols by frequency.
+- **Query history**: Every search is logged with its query, mode, and timestamp so you can replay or compare previous searches.
+- **Tutorial**: Built-in guided walkthrough explaining embeddings, chunking, and search modes.
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Requirements
 
-2. Configure environment variables (copy `.env.example` to `.env`):
-   ```
-   OPENAI_API_KEY=sk-your-key-here
-   CHROMA_PERSIST_DIR=./chroma_data
-   ```
+- Python 3.10 or higher
+- An `OPENAI_API_KEY` environment variable set to a valid OpenAI API key
 
-3. Run the app:
-   ```bash
-   python app.py
-   ```
+### Installation
 
-## Dependencies
+```bash
+cd app
+pip install -r requirements.txt
+```
 
-| Package | Purpose |
-|---------|---------|
-| flask | Web framework |
-| chromadb | Vector database |
-| openai | Embedding API |
-| tiktoken | Token counting |
-| tree-sitter | AST parsing |
-| tree-sitter-python | Python grammar for tree-sitter |
-| python-dotenv | Environment variable management |
-| pathspec | `.gitignore` pattern matching |
+### Running
+
+```bash
+cd app
+OPENAI_API_KEY=your-key python app.py
+```
+
+The app starts on `http://localhost:5000` by default. Navigate to that URL in a browser to access the UI.
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes | Used to generate embeddings via `text-embedding-3-small` |
+| `CHROMA_PERSIST_DIR` | No | Directory for ChromaDB storage (default: `./chroma_data`) |
+| `FLASK_ENV` | No | Set to `development` for debug mode (default: `development`) |
+| `SECRET_KEY` | No | Flask session secret (use a random string in production) |
+
+## Project Layout
+
+```
+app/
+├── app.py                   # Flask application factory
+├── config.py                # AppConfig, ChromaConfig, IngestionConfig, SearchConfig
+├── requirements.txt
+├── models/
+│   ├── chunk.py             # Chunk, ChunkMetadata, ChunkType
+│   ├── search_result.py     # SearchResult, SearchResultSet
+│   └── query_history.py     # QueryHistory entry model
+├── routes/
+│   ├── collections.py       # Collection CRUD endpoints
+│   ├── explorer.py          # Chunk browsing endpoints
+│   ├── search.py            # Semantic and regex search endpoints
+│   ├── visualizer.py        # Embedding projection endpoints
+│   ├── similarity.py        # Pairwise similarity endpoints
+│   ├── statistics.py        # Aggregate metrics endpoints
+│   ├── history.py           # Query history endpoints
+│   ├── suggestions.py       # Search suggestion endpoints
+│   ├── regex_tester.py      # Live regex validation endpoint
+│   └── tutorial.py          # Tutorial page routes
+├── services/
+│   ├── chroma_client.py     # Singleton ChromaDB client manager
+│   ├── ingestion_service.py # AST parsing, text splitting, batch upload
+│   ├── search_service.py    # SemanticSearchStrategy, RegexSearchStrategy
+│   └── visualization_service.py  # PCA / random-projection dimensionality reduction
+└── utils/
+    ├── text_splitter.py     # Lightweight token estimation utilities
+    └── code_stats.py        # Chunk aggregation and statistics helpers
+```
+
+## Ingesting a Codebase
+
+Use the Collections UI to create a new collection, then trigger ingestion on any local directory. Alternatively, call the ingestion API directly:
+
+```bash
+curl -X POST http://localhost:5000/api/collections \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my_project", "source_dir": "/path/to/repo"}'
+```
+
+Progress is streamed back as server-sent events. Once complete, the collection is searchable immediately.

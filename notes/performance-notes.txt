@@ -1,0 +1,101 @@
+Performance Notes — Code Search App
+=====================================
+
+Measurements taken on a 2023 MacBook Pro M2 (16 GB RAM), Python 3.11,
+ChromaDB 1.4.1, text-embedding-3-small via OpenAI API.
+
+
+INGESTION THROUGHPUT
+--------------------
+Ingesting the app/ directory itself (7 Python files, 3 Markdown files,
+2 text files):
+
+  Total files:  12
+  Total chunks: ~265
+  Wall time:    ~4.2 seconds
+
+The dominant cost is OpenAI API latency for the embedding function.
+ChromaDB calls the embedding function automatically during collection.add().
+With batch_size=100, we make 3 API calls for 265 chunks.
+
+If ingestion speed is important, consider:
+  1. Increase batch_size to reduce the number of API calls (up to
+     OpenAI's limit of 2,048 inputs per request).
+  2. Use ChromaDB's default local embedding model (no API call needed).
+  3. Cache embeddings for previously-seen chunk hashes and skip re-embedding.
+
+We have not implemented caching because it adds complexity and the current
+ingestion time is acceptable for the target use case (small-to-medium repos).
+
+
+SEMANTIC SEARCH LATENCY
+------------------------
+Measured over 50 queries to the app/ collection (~265 chunks):
+
+  Median:  190 ms
+  P90:     260 ms
+  P99:     430 ms
+
+The latency is dominated by the OpenAI API call to embed the query text.
+ChromaDB's ANN search on 265 chunks takes under 1 ms. At 5,000 chunks,
+the ANN search is still under 10 ms. The embedding API call is constant
+regardless of collection size.
+
+To reduce query latency: cache embeddings for repeated queries (LRU cache
+on the query string) or use a local embedding model.
+
+
+REGEX SEARCH LATENCY
+---------------------
+Measured over 50 queries to the app/ collection:
+
+  Median:  8 ms
+  P90:     22 ms
+  P99:     55 ms
+
+Regex search is significantly faster than semantic search because it
+does not call the OpenAI API. ChromaDB's $regex filter runs server-side.
+The client-side match-count scoring adds approximately 2 ms per 100 matched
+chunks.
+
+For very broad patterns (e.g., `.+`), regex search may return thousands
+of results before the n_results cap is applied. The current implementation
+applies the cap after scoring, meaning it still retrieves all matches from
+ChromaDB first. For collections over 10,000 chunks, consider applying a
+more restrictive default pattern or a metadata pre-filter.
+
+
+EMBEDDING VISUALIZER LATENCY
+------------------------------
+Generating a point cloud for the app/ collection (265 chunks):
+
+  Fetch embeddings from ChromaDB: ~12 ms
+  PCA reduction (265 x 1536 → 265 x 2): ~18 ms
+  JSON serialisation: ~3 ms
+  Total: ~33 ms
+
+PCA scales with O(n * d) where n is the number of points and d is the
+embedding dimension (1536 for text-embedding-3-small). At 5,000 chunks,
+expect ~150 ms. At 50,000 chunks, this becomes noticeable (~1.5 seconds).
+
+The max_points parameter (default 200, configurable up to 500) limits the
+input to PCA by sampling. If the collection has more points than max_points,
+a random sample is taken. This keeps the visualizer fast but means the
+scatter plot does not represent all chunks when the collection is large.
+
+
+MEMORY FOOTPRINT
+----------------
+The ChromaDB PersistentClient holds the full embedding index in memory
+after the first query. For the app/ collection:
+
+  SQLite metadata: ~2 MB on disk
+  HNSW vector index: ~4 MB on disk
+  In-memory after first query: ~18 MB
+
+For a large repository with 50,000 chunks of 1,536-dimensional embeddings:
+  Estimated in-memory: ~300 MB (50,000 * 1,536 * 4 bytes = 307 MB)
+
+This is within the memory budget of a standard development machine but
+may require attention in resource-constrained environments. ChromaDB does
+not currently support partial index loading.

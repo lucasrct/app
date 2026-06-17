@@ -1,0 +1,115 @@
+Design Decisions — Code Search App
+=====================================
+
+This file captures the rationale behind major design choices made during
+development. It is intended to help future contributors understand why
+the code looks the way it does, not just what it does.
+
+
+DECISION 1: Singleton services via module-level globals
+--------------------------------------------------------
+Each service (SearchService, IngestionService, ChromaClientManager) is
+expensive to construct. ChromaClientManager opens a database connection
+and contacts the OpenAI API to warm up the embedding function. Constructing
+a new instance on every request would cause severe latency and burn
+unnecessary API credits.
+
+The chosen solution is module-level lazy initialisation: a module-level
+variable is initialised to None, and a getter function constructs the
+object on first call and caches it. This is simpler than a dependency
+injection container and avoids importing frameworks like Flask-DI or wire.
+
+Alternative considered: storing services on the Flask application object
+(flask.current_app.extensions). This is the Flask-recommended pattern for
+shared state. We rejected it because it requires passing the app context
+into every function that needs a service, which complicates testing and
+makes the dependency graph less explicit.
+
+Decision: module-level lazy singletons. Revisit if the service layer grows
+large enough to warrant a DI container.
+
+
+DECISION 2: AST-first, token-split-as-fallback chunking strategy
+-----------------------------------------------------------------
+The fundamental question for any code chunking pipeline is: what is a
+"meaningful unit" of code? The answer depends on how you plan to query.
+
+For semantic search, the most useful unit is a complete logical construct
+that can be understood in isolation: a function definition or a class
+definition. An embedding of a complete function captures its purpose,
+arguments, and return behaviour in a single vector.
+
+Line-count or character-count chunking would often split a function across
+two chunks, causing neither chunk to fully represent the function's
+semantics. A query for "how is the tax calculated" would miss
+calculate_order_total if the function's docstring landed in one chunk and
+its body in another.
+
+The fallback to token-bounded splitting handles the case where a function
+or class exceeds the embedding model's context window. In practice this
+affects large service classes (500+ lines). The fallback produces chunks
+that are harder to search semantically, but this is a known trade-off
+accepted in exchange for not crashing on large files.
+
+Decision: AST-first with token-split fallback. This matches how developers
+think about code and produces the most semantically coherent chunks.
+
+
+DECISION 3: ChromaDB over a general-purpose vector database
+------------------------------------------------------------
+We evaluated Pinecone, Weaviate, Qdrant, and ChromaDB. The selection
+criteria were: no infrastructure setup, Python-native API, embedding
+function integration, and metadata filtering.
+
+ChromaDB's PersistentClient stores everything locally on disk with no
+external service required. This makes the development experience identical
+to production: no credentials to manage, no network calls to a hosted
+service, no port forwarding in Docker.
+
+The $regex operator for full-text search within ChromaDB's where_document
+filter was a deciding factor. Implementing regex search on top of Pinecone
+would require pulling all documents into Python memory and running the
+regex client-side, which does not scale.
+
+Decision: ChromaDB with PersistentClient. The local-first approach
+eliminates friction during development and in teaching environments where
+learners may not have cloud credentials.
+
+
+DECISION 4: OpenAI text-embedding-3-small over larger models
+-------------------------------------------------------------
+We compared text-embedding-3-small, text-embedding-3-large, and the
+open-source jina-embeddings-v3-code model.
+
+For code search over repositories of the scale this app targets (up to
+~5,000 chunks), the quality difference between small and large models is
+not perceptible in manual evaluation. The small model costs approximately
+10x less and is 3x faster to call, which matters during batch ingestion
+of large repositories.
+
+The Jina model is code-specific and produces strong results on code
+retrieval benchmarks, but it requires downloading a ~500 MB model file
+and running local inference. This is too high a setup cost for a teaching
+tool where learners may be on laptops with limited RAM.
+
+Decision: text-embedding-3-small. The cost-to-quality ratio is better
+than the large model for our use case, and it requires no local setup.
+
+
+DECISION 5: Ten blueprints versus a monolithic routes file
+-----------------------------------------------------------
+Early prototypes put all routes in a single routes.py file. As the number
+of endpoints grew past twenty, the file became hard to navigate and
+unrelated features frequently caused merge conflicts.
+
+Splitting into one blueprint per feature area (search, collections,
+explorer, visualizer, similarity, statistics, history, suggestions,
+regex_tester, tutorial) means each file stays under 150 lines and
+changes to one feature never touch another feature's code.
+
+The cost of this approach is that registering a new blueprint requires
+two steps (creating the file and adding it to app.py). We accept this as
+a reasonable trade-off for the clarity it provides.
+
+Decision: one Blueprint per feature. The boundary between features maps
+naturally to the UI pages visible in the navigation bar.

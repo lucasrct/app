@@ -7,12 +7,14 @@ from typing import Optional, Dict, Any
 
 
 class ChunkType(Enum):
-    """Classification of code chunk types from AST parsing."""
+    """Classification of chunk types from AST parsing and text splitting."""
     FUNCTION = "function_definition"
     CLASS = "class_definition"
     MODULE = "module"
     GAP = "gap"
     UNKNOWN = "unknown"
+    MARKDOWN_SECTION = "markdown_section"
+    TEXT_PARAGRAPH = "text_paragraph"
 
     @classmethod
     def from_node_type(cls, node_type: str) -> "ChunkType":
@@ -33,6 +35,8 @@ class ChunkType(Enum):
             "module": "Module",
             "gap": "Top-Level Code",
             "unknown": "Unknown",
+            "markdown_section": "Section",
+            "text_paragraph": "Paragraph",
         }
         return labels.get(self.value, "Unknown")
 
@@ -45,6 +49,8 @@ class ChunkType(Enum):
             "module": "bi-file-earmark-code",
             "gap": "bi-code-square",
             "unknown": "bi-question-circle",
+            "markdown_section": "bi-file-earmark-text",
+            "text_paragraph": "bi-paragraph",
         }
         return icons.get(self.value, "bi-question-circle")
 

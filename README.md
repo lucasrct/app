@@ -1,10 +1,10 @@
-# ChromaDB Code Search UI
+# Code Search App
 
-A Flask web application for searching, browsing, and visualizing Python code using semantic embeddings and ChromaDB. Built as a companion app for the **Context Engineering with Chroma** course.
+A Flask-based web application for indexing, searching, and exploring Python codebases stored in ChromaDB. The app ingests a source directory, splits the code into semantic chunks using Abstract Syntax Trees and token-bounded splitting, and provides a browser UI for semantic and regex search over the resulting collection.
 
-## Purpose
+## Overview
 
-This app serves two roles in the course:
+When you point the app at a source directory, it walks every supported file, parses Python files using tree-sitter to extract function and class definitions as atomic units, and stores each chunk alongside rich metadata (file path, line range, symbol name, chunk type) in a ChromaDB persistent collection. You can then search the indexed codebase using natural-language queries (semantic search via OpenAI embeddings) or regular expressions (full-text filter via ChromaDB's `$regex` operator).
 
 1. **Teaching material** — Students ingest this codebase into ChromaDB using the AST-based chunking pipeline they build in the labs. The well-structured Python code (models, services, routes, utils) makes it an ideal target for practicing chunking strategies.
 2. **Interactive tool** — Once ingested, students launch this app to explore their collections, run searches, and see how their chunking and metadata decisions affect retrieval quality.
@@ -46,6 +46,9 @@ Each chunk is stored with metadata: its file path, its start and end line, its s
 
 ## Project Structure
 
+```bash
+cd app
+pip install -r requirements.txt
 ```
 app/
 ├── app.py                  # Flask application factory and entry point
@@ -99,15 +102,16 @@ app/
     └── css/style.css       # Custom styles
 ```
 
-## Design Patterns
+The app starts on `http://localhost:5000` by default. Navigate to that URL in a browser to access the UI.
 
-The codebase intentionally demonstrates several software design patterns, making it a richer target for code search exercises:
+### Environment Variables
 
-- **Strategy** — `SearchStrategy`, `SimilarityComputer`, `DimensionReducer`, `SuggestionStrategy`
-- **Singleton** — `ChromaClientManager` for a single DB connection
-- **Factory** — `get_reducer()`, `get_similarity_computer()`, `get_tutorial_builder()`
-- **Builder** — Tutorial builders (`DashboardTutorialBuilder`, `CollectionTutorialBuilder`)
-- **Facade** — `SearchService`, `SuggestionService`, `StatisticsService` wrapping multiple strategies
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes | Used to generate embeddings via `text-embedding-3-small` |
+| `CHROMA_PERSIST_DIR` | No | Directory for ChromaDB storage (default: `./chroma_data`) |
+| `FLASK_ENV` | No | Set to `development` for debug mode (default: `development`) |
+| `SECRET_KEY` | No | Flask session secret (use a random string in production) |
 
 ## Configuration
 
@@ -133,31 +137,4 @@ A few constraints are worth knowing before you rely on the app:
 
 ## Setup
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Configure environment variables (copy `.env.example` to `.env`):
-   ```
-   OPENAI_API_KEY=sk-your-key-here
-   CHROMA_PERSIST_DIR=./chroma_data
-   ```
-
-3. Run the app:
-   ```bash
-   python app.py
-   ```
-
-## Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| flask | Web framework |
-| chromadb | Vector database |
-| openai | Embedding API |
-| tiktoken | Token counting |
-| tree-sitter | AST parsing |
-| tree-sitter-python | Python grammar for tree-sitter |
-| python-dotenv | Environment variable management |
-| pathspec | `.gitignore` pattern matching |
+Progress is streamed back as server-sent events. Once complete, the collection is searchable immediately.

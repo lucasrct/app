@@ -51,7 +51,7 @@ class SearchConfig:
 class IngestionConfig:
     """Configuration for the code ingestion pipeline."""
     max_tokens_per_chunk: int = 1000
-    supported_extensions: tuple = (".py",)
+    supported_extensions: tuple = (".py", ".md", ".txt")
     ignore_patterns: tuple = ("__pycache__", ".git", ".env", "node_modules")
     batch_size: int = 100
     tokenizer_model: str = "text-embedding-3-small"

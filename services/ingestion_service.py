@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import List, Optional, Callable, Set
 
 import tiktoken
-
-logger = logging.getLogger(__name__)
 import tree_sitter_python as tspython
 from tree_sitter import Language, Parser, Node
 
 from models.chunk import Chunk, ChunkMetadata, ChunkType
 from services.chroma_client import get_chroma_client
 from config import get_config
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -136,9 +136,12 @@ class TextSplitter:
         def flush():
             if not current_lines:
                 return
+            doc = "\n".join(current_lines)
+            if not doc.strip():
+                return
             splits.append({
                 "id": str(uuid.uuid4()),
-                "document": "\n".join(current_lines),
+                "document": doc,
                 "start_line": split_start,
                 "end_line": split_start + len(current_lines) - 1,
             })
@@ -159,6 +162,61 @@ class TextSplitter:
         return splits
 
 
+class MarkdownSplitter:
+    """Splits a Markdown file into header-bounded sections.
+
+    Each H1/H2/H3 header starts a new chunk.  If a section exceeds
+    max_tokens, TextSplitter subdivides it further.
+    The header text is stored as the chunk's symbol for filtering.
+    """
+
+    def __init__(self, token_counter: TokenCounter):
+        self._counter = token_counter
+        self._splitter = TextSplitter(token_counter)
+
+    def split(self, source: str, max_tokens: int) -> List[dict]:
+        """Split markdown into header-bounded chunks.
+
+        Returns list of dicts with keys: id, document, start_line, end_line, symbol.
+        """
+        import re
+        sections: List[tuple] = []
+        current_header: Optional[str] = None
+        current_lines: List[str] = []
+        current_start: int = 0
+
+        for lineno, line in enumerate(source.split("\n")):
+            if re.match(r"^#{1,3} ", line):
+                if current_lines:
+                    sections.append((current_header, current_start, current_lines))
+                current_header = line.lstrip("#").strip()
+                current_lines = [line]
+                current_start = lineno
+            else:
+                current_lines.append(line)
+
+        if current_lines:
+            sections.append((current_header, current_start, current_lines))
+
+        chunks: List[dict] = []
+        for header, start_line, lines in sections:
+            text = "\n".join(lines)
+            if self._counter.count(text) <= max_tokens:
+                chunks.append({
+                    "id": str(uuid.uuid4()),
+                    "document": text,
+                    "start_line": start_line,
+                    "end_line": start_line + len(lines) - 1,
+                    "symbol": header,
+                })
+            else:
+                for sub in self._splitter.split(text, start_line, max_tokens):
+                    sub["symbol"] = header
+                    chunks.append(sub)
+
+        return chunks
+
+
 class IngestionService:
     """Orchestrates the full pipeline: walk repo -> parse -> chunk -> store."""
 
@@ -170,6 +228,7 @@ class IngestionService:
             fallback_encoding=config.fallback_encoding,
         )
         self._splitter = TextSplitter(self._token_counter)
+        self._md_splitter = MarkdownSplitter(self._token_counter)
         self._config = config
         self._chroma = get_chroma_client()
 
@@ -255,26 +314,67 @@ class IngestionService:
 
         return chunks
 
+    def chunk_text_file(self, file_path: str,
+                        max_tokens: Optional[int] = None) -> List[Chunk]:
+        """Chunk a Markdown or plain-text file using header/paragraph splitting."""
+        max_tok = max_tokens or self._config.max_tokens_per_chunk
+        suffix = Path(file_path).suffix.lower()
+        now_str = datetime.now().isoformat()
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            source = f.read()
+
+        if suffix == ".md":
+            raw_chunks = self._md_splitter.split(source, max_tok)
+            chunk_type_value = ChunkType.MARKDOWN_SECTION.value
+            language = "markdown"
+        else:
+            raw_chunks = self._splitter.split(source, 0, max_tok)
+            for c in raw_chunks:
+                c.setdefault("symbol", None)
+            chunk_type_value = ChunkType.TEXT_PARAGRAPH.value
+            language = "text"
+
+        chunks: List[Chunk] = []
+        for s in raw_chunks:
+            chunks.append(Chunk(
+                id=s["id"],
+                document=s["document"],
+                metadata=ChunkMetadata(
+                    path=file_path,
+                    start_line=s["start_line"],
+                    end_line=s["end_line"],
+                    symbol=s.get("symbol"),
+                    chunk_type=chunk_type_value,
+                    language=language,
+                    ingested_at=now_str,
+                ),
+            ))
+        return chunks
+
     def ingest_directory(self, directory: str, collection_name: str,
                          progress_callback: Optional[Callable] = None) -> IngestionProgress:
-        """Ingest all Python files from a directory into a ChromaDB collection."""
+        """Ingest all files from a directory into a ChromaDB collection."""
         logger.info(f"Starting ingestion: directory='{directory}' collection='{collection_name}'")
         collection = self._chroma.get_collection(collection_name)
         progress = IngestionProgress()
 
-        py_files = self._discover_python_files(directory)
-        progress.total_files = len(py_files)
-        logger.info(f"Discovered {len(py_files)} Python files to process")
+        all_files = self._discover_files(directory)
+        progress.total_files = len(all_files)
+        logger.info(f"Discovered {len(all_files)} files to process")
 
         buffer: List[Chunk] = []
         batch_size = self._config.batch_size
 
-        for file_path in py_files:
+        for file_path in all_files:
             progress.current_file = str(file_path)
             progress.processed_files += 1
 
             try:
-                new_chunks = self.chunk_file(str(file_path))
+                if file_path.suffix.lower() == ".py":
+                    new_chunks = self.chunk_file(str(file_path))
+                else:
+                    new_chunks = self.chunk_text_file(str(file_path))
                 buffer.extend(new_chunks)
                 progress.total_chunks += len(new_chunks)
 
@@ -304,7 +404,7 @@ class IngestionService:
 
         return progress
 
-    def _discover_python_files(self, directory: str) -> List[Path]:
+    def _discover_files(self, directory: str) -> List[Path]:
         """Walk a directory and find all Python files, respecting ignore patterns."""
         root = Path(directory)
         ignore = set(self._config.ignore_patterns)

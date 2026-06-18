@@ -44,13 +44,17 @@ It uses **tree-sitter** to parse each file into an abstract syntax tree, then ta
 
 Each chunk is stored with metadata: its file path, its start and end line, its symbol name, and its chunk type (function, class, module, or gap). Only Python files are ingested.
 
-## Project Structure
+## Setup
+
+Progress is streamed back as server-sent events. Once complete, the collection is searchable immediately.
 
 ```bash
 cd app
 pip install -r requirements.txt
 ```
+## Project Structure
 
+```text
 app/
 ├── app.py                  # Flask application factory and entry point
 ├── config.py               # Dataclass-based configuration (env vars, defaults)
@@ -118,7 +122,7 @@ app/
 └── notes/                  # Developer notes
     ├── design-decisions.txt  # Design decision log
     └── performance-notes.txt # Performance observations and notes
-
+```
 
 The app starts on `http://localhost:5000` by default. Navigate to that URL in a browser to access the UI.
 
@@ -153,6 +157,4 @@ A few constraints are worth knowing before you rely on the app:
 - **Regex search is bounded.** It returns at most 100 matches and times out after 5 seconds, so a very broad pattern may not surface everything.
 - **The embedding view is a projection.** The 2-D visualizer reduces high-dimensional embeddings down to two dimensions, which is useful for spotting clusters but loses detail.
 
-## Setup
 
-Progress is streamed back as server-sent events. Once complete, the collection is searchable immediately.

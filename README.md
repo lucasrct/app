@@ -50,6 +50,7 @@ Each chunk is stored with metadata: its file path, its start and end line, its s
 cd app
 pip install -r requirements.txt
 ```
+
 app/
 ├── app.py                  # Flask application factory and entry point
 ├── config.py               # Dataclass-based configuration (env vars, defaults)
@@ -117,7 +118,7 @@ app/
 └── notes/                  # Developer notes
     ├── design-decisions.txt  # Design decision log
     └── performance-notes.txt # Performance observations and notes
-```
+
 
 The app starts on `http://localhost:5000` by default. Navigate to that URL in a browser to access the UI.
 

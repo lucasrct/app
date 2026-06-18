@@ -1,229 +1,459 @@
-/* ChromaDB Code Search - Custom Dark Theme */
+/* ============================================================
+   ChromaLearn — Chroma × DeepLearning.AI
+   Light theme design system
+   ============================================================ */
+
+:root {
+    /* Surfaces */
+    --bg:        #ffffff;
+    --surface:   #f9fafb;
+    --surface-2: #f3f4f6;
+    --border:    #e5e7eb;
+
+    /* Text */
+    --text-1: #111827;
+    --text-2: #6b7280;
+    --text-3: #9ca3af;
+
+    /* Chroma brand */
+    --blue:       #327EFF;
+    --blue-hover: #1a6ef0;
+    --blue-lt:    #eff5ff;
+    --orange:     #FF6446;
+    --orange-lt:  #fff3f0;
+    --yellow:     #FFDE2D;
+
+    /* DeepLearning.AI brand */
+    --coral:      #EF4E37;
+    --coral-hover:#d63a20;
+    --coral-lt:   #fff1ef;
+
+    /* Semantic colours */
+    --success:    #10b981;
+    --warning:    #f59e0b;
+    --danger:     #ef4444;
+    --info:       #3b82f6;
+
+    /* Shape */
+    --radius:    8px;
+    --radius-lg: 10px;
+    --radius-xl: 14px;
+
+    /* Shadow */
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.06);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,.12);
+}
+
+/* ── Base ─────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
-    background-color: #0d1117;
-    color: #c9d1d9;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Navbar */
-.navbar {
-    background-color: #161b22 !important;
-    border-color: #30363d !important;
+/* ── Header / Navbar ──────────────────────────────────────── */
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    padding: 0 20px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    flex-shrink: 0;
 }
 
-.navbar-brand {
-    color: #58a6ff !important;
-    font-weight: 600;
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-.nav-link.active {
-    color: #58a6ff !important;
-    border-bottom: 2px solid #58a6ff;
+.header-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
 }
 
-/* Cards */
+.header-app-name {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    color: var(--text-1);
+    letter-spacing: -0.02em;
+    text-decoration: none;
+}
+
+.header-app-name:hover {
+    color: var(--blue);
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.header-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-2);
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.header-nav-link:hover {
+    background: var(--surface);
+    color: var(--text-1);
+}
+
+.header-nav-link.active {
+    background: var(--blue-lt);
+    color: var(--blue);
+}
+
+/* ── Page layout ──────────────────────────────────────────── */
+
+.page-content {
+    flex: 1;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+
+.app-footer {
+    border-top: 1px solid var(--border);
+    padding: 12px 20px;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.footer-sep { color: var(--border); }
+
+/* ── Bootstrap card overrides ─────────────────────────────── */
+
 .card {
-    background-color: #161b22;
-    border-color: #30363d;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
 }
 
 .card-header {
-    background-color: #1c2128;
-    border-color: #30363d;
+    background: var(--surface);
+    border-color: var(--border);
+    font-weight: 500;
 }
 
 .card-footer {
-    background-color: #1c2128;
-    border-color: #30363d;
+    background: var(--surface);
+    border-color: var(--border);
 }
 
+/* ── Collection cards ─────────────────────────────────────── */
+
 .collection-card {
+    border-top-width: 3px;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: pointer;
 }
 
 .collection-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-md);
 }
 
-/* Result cards */
+/* ── Result cards (search results) ───────────────────────── */
+
 .result-card {
-    border-left: 3px solid #30363d;
-    transition: border-color 0.15s ease;
+    border-left: 3px solid var(--border);
+    transition: border-left-color 0.15s ease, box-shadow 0.15s ease;
+    border-radius: var(--radius-lg);
 }
 
 .result-card:hover {
-    border-left-color: #58a6ff;
+    border-left-color: var(--blue);
+    box-shadow: 0 2px 8px rgba(50, 126, 255, .08);
 }
 
-/* Chunk cards */
+/* ── Chunk cards (explorer) ───────────────────────────────── */
+
 .chunk-card .card-header {
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: background 0.15s ease;
+    user-select: none;
 }
 
 .chunk-card .card-header:hover {
-    background-color: #262c36;
+    background: var(--surface-2);
 }
 
-/* Code blocks */
+/* ── Code blocks ──────────────────────────────────────────── */
+
 pre {
     margin: 0;
-    border-radius: 0;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
 pre code {
-    font-size: 0.85rem;
-    line-height: 1.5;
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace !important;
+    font-size: 0.8125rem;
+    line-height: 1.6;
     padding: 1rem !important;
 }
 
-/* Regex match highlights */
-.regex-match {
-    background-color: #f0b132;
-    color: #0d1117;
-    padding: 1px 3px;
-    border-radius: 2px;
+/* ── Mode toggle (replaces Bootstrap nav-pills) ───────────── */
+
+.mode-toggle {
+    display: flex;
+    width: 100%;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 3px;
+    gap: 2px;
+}
+.mode-toggle .mode-btn {
+    flex: 1;
+    text-align: center;
 }
 
-.regex-highlight {
-    background-color: rgba(240, 177, 50, 0.2);
-    color: #f0b132;
-    border: 1px solid rgba(240, 177, 50, 0.3);
-    padding: 1px 4px;
-    border-radius: 3px;
-    font-size: 0.85em;
+.mode-btn {
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    line-height: 1.4;
 }
 
-/* Progress bars */
-.progress {
-    background-color: #21262d;
+.mode-btn.active {
+    background: #fff;
+    color: var(--text-1);
+    box-shadow: var(--shadow-sm);
 }
 
-/* Form controls in dark theme */
-.form-control,
-.form-select {
-    background-color: #0d1117;
-    border-color: #30363d;
-    color: #c9d1d9;
+.mode-btn:not(.active):hover {
+    color: var(--text-1);
 }
+
+/* ── Buttons ──────────────────────────────────────────────── */
+
+/* Primary → coral (DLAI brand) */
+.btn-primary {
+    background-color: var(--coral) !important;
+    border-color: var(--coral) !important;
+    color: #fff !important;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background-color: var(--coral-hover) !important;
+    border-color: var(--coral-hover) !important;
+}
+
+/* Semantic search */
+.btn-semantic {
+    background-color: var(--coral);
+    border-color: var(--coral);
+    color: #fff;
+}
+.btn-semantic:hover, .btn-semantic:focus {
+    background-color: var(--coral-hover);
+    border-color: var(--coral-hover);
+    color: #fff;
+}
+
+/* Regex search */
+.btn-regex {
+    background-color: var(--orange);
+    border-color: var(--orange);
+    color: #fff;
+}
+.btn-regex:hover, .btn-regex:focus {
+    background-color: #e8553a;
+    border-color: #e8553a;
+    color: #fff;
+}
+
+/* Metadata filter */
+.btn-metadata {
+    background-color: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+}
+.btn-metadata:hover, .btn-metadata:focus {
+    background-color: var(--blue-hover);
+    border-color: var(--blue-hover);
+    color: #fff;
+}
+
+/* Coral utility (for tutorial buttons etc.) */
+.btn-coral {
+    background-color: var(--coral);
+    border-color: var(--coral);
+    color: #fff;
+}
+.btn-coral:hover, .btn-coral:focus {
+    background-color: var(--coral-hover);
+    border-color: var(--coral-hover);
+    color: #fff;
+}
+
+/* ── Tour button ──────────────────────────────────────────── */
+
+.btn-tutorial {
+    background: transparent;
+    border: 1px solid var(--coral);
+    color: var(--coral);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.btn-tutorial:hover {
+    background: var(--coral-lt);
+}
+
+/* ── Form controls ────────────────────────────────────────── */
 
 .form-control:focus,
 .form-select:focus {
-    background-color: #0d1117;
-    border-color: #58a6ff;
-    color: #c9d1d9;
-    box-shadow: 0 0 0 0.2rem rgba(88, 166, 255, 0.25);
+    border-color: var(--blue);
+    box-shadow: 0 0 0 3px rgba(50, 126, 255, .15);
 }
 
-.form-control::placeholder {
-    color: #484f58;
+.form-control::placeholder,
+.form-select::placeholder {
+    color: var(--text-3);
 }
 
-/* Badge sizing */
+/* ── Bootstrap nav-pills fallback ─────────────────────────── */
+
+.nav-pills .nav-link {
+    color: var(--text-2);
+    border-radius: 6px;
+}
+
+.nav-pills .nav-link.active,
+.nav-pills .show > .nav-link {
+    background-color: var(--blue-lt);
+    color: var(--blue);
+}
+
+/* ── Badges ───────────────────────────────────────────────── */
+
 .badge {
     font-weight: 500;
+    font-size: 0.75rem;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+/* Override Bootstrap's bg-info to use our blue */
+.bg-info { background-color: var(--blue) !important; }
+.bg-success { background-color: var(--success) !important; }
+.bg-warning { background-color: var(--warning) !important; color: #fff !important; }
+.bg-danger  { background-color: var(--danger) !important; }
+
+/* ── Regex highlights ─────────────────────────────────────── */
+
+.regex-match {
+    background-color: var(--yellow);
+    color: var(--text-1);
+    padding: 1px 3px;
+    border-radius: 3px;
 }
 
-::-webkit-scrollbar-track {
-    background: #0d1117;
+.regex-highlight {
+    background-color: rgba(255, 222, 45, .2);
+    color: #92700a;
+    border: 1px solid rgba(255, 222, 45, .5);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.82em;
+    font-family: 'IBM Plex Mono', monospace;
 }
 
-::-webkit-scrollbar-thumb {
-    background: #30363d;
-    border-radius: 4px;
+/* ── Progress ─────────────────────────────────────────────── */
+
+.progress { background-color: var(--surface-2); }
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+/* ── Misc utilities ───────────────────────────────────────── */
+
+.cursor-pointer { cursor: pointer; }
+
+.font-monospace {
+    font-family: 'IBM Plex Mono', SFMono-Regular, Consolas, monospace !important;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #484f58;
+.text-muted { color: var(--text-2) !important; }
+
+.history-item:hover,
+.bookmark-item:hover {
+    background-color: var(--surface);
 }
 
-/* List group items */
-.list-group-item {
-    border-color: #21262d;
-}
-
-/* Modal */
-.modal-content {
-    background-color: #161b22;
-    border-color: #30363d;
-}
-
-/* Footer */
-footer {
-    border-color: #21262d !important;
-    color: #484f58;
-}
-
-/* Alerts */
-.alert {
-    border: none;
-}
-
-/* Details/summary styling */
 details summary {
     cursor: pointer;
-    color: #8b949e;
+    color: var(--text-2);
+}
+details summary:hover { color: var(--text-1); }
+
+/* ── Modal ────────────────────────────────────────────────── */
+
+.modal-content {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
 }
 
-details summary:hover {
-    color: #c9d1d9;
-}
+/* ── Alert ────────────────────────────────────────────────── */
 
-/* Nav pills */
-.nav-pills .nav-link {
-    color: #8b949e;
-}
+.alert { border-radius: var(--radius); }
 
-.nav-pills .nav-link.active {
-    background-color: #21262d;
-    color: #58a6ff;
-    border-bottom: none;
-}
+/* ── Responsive ───────────────────────────────────────────── */
 
-/* Tab content */
-.tab-content {
-    padding-top: 0.5rem;
-}
-
-/* Responsive */
 @media (max-width: 768px) {
-    .container-fluid {
-        padding-left: 1rem;
-        padding-right: 1rem;
-    }
+    .container-fluid { padding-left: 1rem; padding-right: 1rem; }
+    .header-product-name { display: none; }
 }
 
-/* Font monospace override */
-.font-monospace {
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace !important;
-}
+/* ================================================================
+   Tutorial Overlay System
+   ================================================================ */
 
-/* Cursor pointer utility */
-.cursor-pointer {
-    cursor: pointer;
-}
-
-/* History items */
-.history-item:hover {
-    background-color: #21262d;
-}
-
-/* Bookmark items */
-.bookmark-item:hover {
-    background-color: #21262d;
-}
-
-/* ========== Tutorial Overlay ========== */
-
-/* Dark backdrop behind the spotlight */
 .tutorial-backdrop {
     position: fixed;
     inset: 0;
@@ -232,121 +462,108 @@ details summary:hover {
     transition: opacity 0.3s ease;
 }
 
-/* SVG mask overlay - dims everything except the target */
-.tutorial-backdrop svg {
-    width: 100%;
-    height: 100%;
-}
+.tutorial-backdrop svg { width: 100%; height: 100%; }
 
-/* The spotlight cutout glow */
 .tutorial-spotlight {
     position: fixed;
     z-index: 9999;
-    border-radius: 8px;
-    box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.5),
-                0 0 20px rgba(88, 166, 255, 0.3);
+    border-radius: var(--radius);
+    box-shadow: 0 0 0 4px rgba(239, 78, 55, .5),
+                0 0 20px rgba(239, 78, 55, .25);
     pointer-events: none;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(.4, 0, .2, 1);
 }
 
-/* Tooltip container */
+@keyframes tutorialPulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(239,78,55,.5), 0 0 20px rgba(239,78,55,.25); }
+    50%       { box-shadow: 0 0 0 8px rgba(239,78,55,.3), 0 0 32px rgba(239,78,55,.15); }
+}
+
+.tutorial-spotlight.pulse {
+    animation: tutorialPulse 2s ease-in-out infinite;
+}
+
 .tutorial-tooltip {
     position: fixed;
     z-index: 10000;
     width: 340px;
-    background: #1c2128;
-    border: 1px solid #58a6ff;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5),
-                0 0 16px rgba(88, 166, 255, 0.15);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg);
     padding: 0;
     overflow: hidden;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(.4, 0, .2, 1);
     animation: tutorialFadeIn 0.3s ease;
 }
 
 @keyframes tutorialFadeIn {
     from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Tooltip header with step icon and category color strip */
 .tutorial-tooltip-header {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 14px 16px 10px;
-    border-bottom: 1px solid #30363d;
+    border-bottom: 1px solid var(--border);
 }
 
 .tutorial-tooltip-header .step-icon {
     font-size: 1.3rem;
-    color: #58a6ff;
+    color: var(--coral);
     flex-shrink: 0;
 }
 
 .tutorial-tooltip-header .step-title {
     font-weight: 600;
     font-size: 0.95rem;
-    color: #e6edf3;
+    color: var(--text-1);
     line-height: 1.3;
 }
 
-/* Category color strip at the top */
-.tutorial-tooltip[data-category="navigation"] { border-top: 3px solid #58a6ff; }
-.tutorial-tooltip[data-category="action"] { border-top: 3px solid #3fb950; }
-.tutorial-tooltip[data-category="information"] { border-top: 3px solid #8b949e; }
-.tutorial-tooltip[data-category="feature"] { border-top: 3px solid #d2a8ff; }
-.tutorial-tooltip[data-category="tip"] { border-top: 3px solid #f0b132; }
+/* Category top-border strips */
+.tutorial-tooltip[data-category="navigation"]   { border-top: 3px solid var(--blue); }
+.tutorial-tooltip[data-category="action"]       { border-top: 3px solid var(--success); }
+.tutorial-tooltip[data-category="information"]  { border-top: 3px solid var(--text-3); }
+.tutorial-tooltip[data-category="feature"]      { border-top: 3px solid #8b5cf6; }
+.tutorial-tooltip[data-category="tip"]          { border-top: 3px solid var(--warning); }
 
-/* Tooltip body text */
 .tutorial-tooltip-body {
     padding: 12px 16px;
-    color: #8b949e;
+    color: var(--text-2);
     font-size: 0.875rem;
     line-height: 1.6;
 }
 
-/* Tooltip footer with navigation buttons and step counter */
 .tutorial-tooltip-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 10px 16px 14px;
-    border-top: 1px solid #30363d;
+    border-top: 1px solid var(--border);
 }
 
-.tutorial-step-counter {
-    font-size: 0.8rem;
-    color: #484f58;
-}
+.tutorial-step-counter { font-size: 0.8rem; color: var(--text-3); }
 
-.tutorial-step-dots {
-    display: flex;
-    gap: 5px;
-}
+.tutorial-step-dots { display: flex; gap: 5px; margin-top: 4px; }
 
 .tutorial-step-dot {
-    width: 6px;
-    height: 6px;
+    width: 6px; height: 6px;
     border-radius: 50%;
-    background-color: #30363d;
+    background: var(--border);
     transition: all 0.2s ease;
 }
 
 .tutorial-step-dot.active {
-    background-color: #58a6ff;
+    background: var(--coral);
     transform: scale(1.3);
 }
 
-.tutorial-step-dot.completed {
-    background-color: #3fb950;
-}
+.tutorial-step-dot.completed { background: var(--success); }
 
-.tutorial-nav-buttons {
-    display: flex;
-    gap: 8px;
-}
+.tutorial-nav-buttons { display: flex; gap: 8px; align-items: center; }
 
 .tutorial-nav-buttons .btn {
     font-size: 0.8rem;
@@ -354,7 +571,7 @@ details summary:hover {
     border-radius: 6px;
 }
 
-/* Welcome and completion overlays */
+/* Welcome / completion overlays */
 .tutorial-welcome-overlay,
 .tutorial-complete-overlay {
     position: fixed;
@@ -363,70 +580,47 @@ details summary:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(13, 17, 23, 0.85);
+    background: rgba(17, 24, 39, .5);
     animation: tutorialFadeIn 0.3s ease;
 }
 
 .tutorial-welcome-card,
 .tutorial-complete-card {
-    background: #1c2128;
-    border: 1px solid #30363d;
-    border-radius: 16px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
     padding: 32px 40px;
     text-align: center;
     max-width: 420px;
-    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
 }
 
 .tutorial-welcome-card .welcome-icon,
 .tutorial-complete-card .complete-icon {
     font-size: 3rem;
-    color: #58a6ff;
+    color: var(--coral);
     margin-bottom: 16px;
 }
 
-.tutorial-complete-card .complete-icon {
-    color: #3fb950;
-}
+.tutorial-complete-card .complete-icon { color: var(--success); }
 
 .tutorial-welcome-card h3,
 .tutorial-complete-card h3 {
-    color: #e6edf3;
+    color: var(--text-1);
     margin-bottom: 10px;
     font-size: 1.4rem;
+    font-weight: 700;
 }
 
 .tutorial-welcome-card p,
 .tutorial-complete-card p {
-    color: #8b949e;
+    color: var(--text-2);
     margin-bottom: 24px;
     font-size: 0.95rem;
 }
 
-/* Pulse animation for highlighted elements */
-@keyframes tutorialPulse {
-    0%, 100% { box-shadow: 0 0 0 4px rgba(88, 166, 255, 0.5), 0 0 20px rgba(88, 166, 255, 0.3); }
-    50% { box-shadow: 0 0 0 8px rgba(88, 166, 255, 0.3), 0 0 30px rgba(88, 166, 255, 0.2); }
-}
+/* ── File browser ──────────────────────────────────────────────────────────── */
+.browser-entry { transition: background 0.1s ease; cursor: pointer; color: var(--text-1); }
+.browser-entry:hover { background: var(--surface-2) !important; }
+.browser-entry:active { background: var(--blue-lt) !important; }
 
-.tutorial-spotlight.pulse {
-    animation: tutorialPulse 2s ease-in-out infinite;
-}
-
-/* Tutorial trigger button */
-.btn-tutorial {
-    background: transparent;
-    border: 1px solid #30363d;
-    color: #8b949e;
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 0.8rem;
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.btn-tutorial:hover {
-    border-color: #58a6ff;
-    color: #58a6ff;
-    background: rgba(88, 166, 255, 0.1);
-}

@@ -10,11 +10,15 @@
                 <li class="breadcrumb-item active">{{ stats.name }}</li>
             </ol>
         </nav>
-        <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
             <h2 class="mb-0"><i class="bi bi-collection me-2"></i>{{ stats.name }}</h2>
             <span class="badge bg-info fs-6">{{ stats.count }} chunks</span>
             <span class="badge bg-success fs-6">{{ stats.unique_files }} files</span>
             <span class="badge bg-warning fs-6">{{ stats.unique_symbols }} symbols</span>
+            <span class="badge fs-6" style="background: var(--blue-lt); color: var(--blue); border: 1px solid var(--blue);"
+                  title="Embedding model used for this collection">
+                <i class="bi bi-cpu me-1"></i>{{ stats.embedding_provider }}/{{ stats.embedding_model }}
+            </span>
         </div>
     </div>
     <div class="col-auto d-flex gap-2 align-items-start">
@@ -46,20 +50,16 @@
         <div class="card">
             <div class="card-body">
                 <!-- Search Mode Tabs -->
-                <ul class="nav nav-pills mb-3" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#semanticTab"
-                                type="button" role="tab">
-                            <i class="bi bi-chat-dots me-1"></i>Semantic
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#regexTab"
-                                type="button" role="tab">
-                            <i class="bi bi-regex me-1"></i>Regex
-                        </button>
-                    </li>
-                </ul>
+                <div class="mode-toggle mb-3" id="collectionModeToggle">
+                    <button class="mode-btn active" data-bs-toggle="pill" data-bs-target="#semanticTab"
+                            type="button" id="collSemanticBtn">
+                        <i class="bi bi-chat-dots me-1"></i>Semantic
+                    </button>
+                    <button class="mode-btn" data-bs-toggle="pill" data-bs-target="#regexTab"
+                            type="button" id="collRegexBtn">
+                        <i class="bi bi-regex me-1"></i>Regex
+                    </button>
+                </div>
 
                 <div class="tab-content">
                     <!-- Semantic Search -->
@@ -77,7 +77,7 @@
                                    min="1" max="30" value="10"
                                    oninput="document.getElementById('nResultsLabel').textContent=this.value">
                         </div>
-                        <button class="btn btn-success w-100" onclick="doSemanticSearch()">
+                        <button class="btn btn-semantic w-100" onclick="doSemanticSearch()">
                             <i class="bi bi-search me-1"></i>Search
                         </button>
                     </div>
@@ -98,10 +98,10 @@
                                    oninput="document.getElementById('nRegexResultsLabel').textContent=this.value">
                         </div>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-warning flex-fill" onclick="doRegexSearch()">
+                            <button class="btn btn-regex flex-fill" onclick="doRegexSearch()">
                                 <i class="bi bi-regex me-1"></i>Search
                             </button>
-                            <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#regexTesterModal"
+                            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#regexTesterModal"
                                     title="Regex Playground" onclick="openRegexTester()">
                                 <i class="bi bi-play-circle"></i>
                             </button>
@@ -112,7 +112,7 @@
                 <!-- Filters -->
                 <hr>
                 <details>
-                    <summary class="fw-bold mb-2">Filters</summary>
+                    <summary class="fw-bold mb-2">Filters <span class="text-muted small fw-normal">(Semantic &amp; Regex)</span></summary>
                     <div class="mb-2">
                         <label for="filterPath" class="form-label small">File Path Contains</label>
                         <input type="text" class="form-control form-control-sm" id="filterPath"
@@ -125,7 +125,20 @@
                             <option value="function_definition">Function</option>
                             <option value="class_definition">Class</option>
                             <option value="gap">Top-Level Code</option>
+                            <option value="json_record">JSON Record</option>
                         </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Metadata Field (exact match)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control font-monospace" id="filterMetaKey"
+                                   list="collFieldSuggestions" placeholder="field" style="max-width:120px;">
+                            <span class="input-group-text px-1">=</span>
+                            <input type="text" class="form-control" id="filterMetaValue"
+                                   placeholder="value">
+                        </div>
+                        <datalist id="collFieldSuggestions"></datalist>
+                        <div class="form-text">e.g. field&nbsp;<code>from_email</code>, value&nbsp;<code>alice@example.com</code></div>
                     </div>
                 </details>
 
@@ -413,21 +426,103 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Ingest Directory into {{ stats.name }}</h5>
+                <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Ingest into {{ stats.name }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <label for="ingestPath" class="form-label">Directory Path</label>
-                    <input type="text" class="form-control" id="ingestPath"
-                           placeholder="e.g., /home/jovyan/work/app">
+                <!-- Ingest mode toggle -->
+                <div class="mode-toggle mb-3" id="ingestModeToggle">
+                    <button class="mode-btn active" type="button" id="ingestDirBtn" onclick="switchIngestMode('dir')">
+                        <i class="bi bi-folder2-open me-1"></i>Directory
+                    </button>
+                    <button class="mode-btn" type="button" id="ingestJsonBtn" onclick="switchIngestMode('json')">
+                        <i class="bi bi-filetype-json me-1"></i>JSON File
+                    </button>
                 </div>
+
+                <!-- Directory panel -->
+                <div id="ingestDirPanel">
+                    <div class="mb-3">
+                        <label for="ingestPath" class="form-label">Directory Path</label>
+                        <input type="text" class="form-control" id="ingestPath"
+                               placeholder="e.g., /home/jovyan/work/app">
+                        <div class="form-text">Recursively ingests all Python, Markdown, and text files.</div>
+                    </div>
+                </div>
+
+                <!-- JSON panel -->
+                <div id="ingestJsonPanel" class="d-none">
+                    <div class="input-group mb-1">
+                        <input type="text" class="form-control font-monospace" id="jsonFilePath"
+                               placeholder="e.g., /home/jovyan/data/messages.jsonl"
+                               oninput="clearIngestFieldPicker()">
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="toggleIngestBrowser()" title="Browse filesystem">
+                            <i class="bi bi-folder2"></i>
+                        </button>
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="detectIngestFields()" title="Detect fields from file">
+                            <i class="bi bi-magic me-1"></i>Detect
+                        </button>
+                    </div>
+                    <div class="form-text mb-2">Accepts <code>.jsonl</code> (one object per line) or a <code>.json</code> array. Click <strong>Detect</strong> to inspect fields.</div>
+
+                    <!-- Inline file browser -->
+                    <div id="ingestFileBrowser" class="d-none border rounded mb-2" style="background:var(--surface);">
+                        <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom"
+                             style="background:var(--surface-2); border-radius:var(--radius) var(--radius) 0 0;">
+                            <button class="btn btn-sm btn-outline-secondary" id="ingestBrowserUpBtn"
+                                    onclick="ingestBrowserUp()" title="Go up"><i class="bi bi-arrow-up"></i></button>
+                            <span class="font-monospace small text-truncate flex-fill"
+                                  id="ingestBrowserPath" style="color:var(--text-2);"></span>
+                        </div>
+                        <div id="ingestBrowserEntries" style="max-height:200px;overflow-y:auto;padding:4px 0;"></div>
+                        <div id="ingestBrowserEmpty" class="text-muted small text-center py-3 d-none">No JSON files or folders here.</div>
+                        <div id="ingestBrowserError" class="alert alert-danger mx-2 my-2 py-2 small d-none"></div>
+                    </div>
+
+                    <!-- Field picker -->
+                    <div id="ingestFieldPicker" class="d-none border rounded mb-2" style="background:var(--surface);">
+                        <div class="px-3 py-2 border-bottom d-flex align-items-center gap-2"
+                             style="background:var(--surface-2); border-radius:var(--radius) var(--radius) 0 0;">
+                            <i class="bi bi-filetype-json text-success"></i>
+                            <span class="small fw-semibold text-truncate flex-fill" id="ingestPickerTitle">Fields</span>
+                            <span class="badge flex-shrink-0" style="background:var(--blue-lt);color:var(--blue);"
+                                  id="ingestRecordCount"></span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="table table-sm table-hover mb-0" style="font-size:0.8rem;">
+                                <thead style="background:var(--surface);">
+                                    <tr>
+                                        <th class="ps-3" style="width:52px;">Text</th>
+                                        <th style="width:52px;">Meta</th>
+                                        <th>Field</th>
+                                        <th class="pe-3 text-muted fw-normal">Sample value</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ingestFieldRows"></tbody>
+                            </table>
+                        </div>
+                        <div class="px-3 py-2 border-top d-flex align-items-center gap-3"
+                             style="background:var(--surface-2); border-radius:0 0 var(--radius) var(--radius);">
+                            <label class="form-label form-label-sm mb-0 text-nowrap">ID Field</label>
+                            <input type="text" class="form-control form-control-sm font-monospace"
+                                   id="ingestIdField" placeholder="auto-generate UUIDs"
+                                   list="ingestIdFieldList" style="max-width:220px;">
+                            <datalist id="ingestIdFieldList"></datalist>
+                            <span class="text-muted small">(optional)</span>
+                        </div>
+                    </div>
+
+                    <div id="ingestFieldDetectError" class="alert alert-danger py-2 small d-none"></div>
+                </div>
+
                 <div id="ingestError" class="alert alert-danger d-none"></div>
                 <div id="ingestSuccess" class="alert alert-success d-none"></div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="btnIngest" onclick="ingestDir()">
+                <button type="button" class="btn btn-primary" id="btnIngest" onclick="doIngest()">
                     <span class="spinner-border spinner-border-sm d-none" id="ingestSpinner"></span>
                     Ingest
                 </button>
@@ -485,7 +580,7 @@
                         </div>
 
                         <!-- Use in search button -->
-                        <button class="btn btn-warning btn-sm w-100 mt-3" onclick="usePatternInSearch()">
+                        <button class="btn btn-regex btn-sm w-100 mt-3" onclick="usePatternInSearch()">
                             <i class="bi bi-arrow-left me-1"></i>Use This Pattern in Search
                         </button>
                     </div>
@@ -515,10 +610,43 @@ let lastSearchQuery = '';  // track for bookmarks
 function getFilters() {
     const path = document.getElementById('filterPath').value.trim();
     const type = document.getElementById('filterType').value;
+    const metaKey = document.getElementById('filterMetaKey').value.trim();
+    const metaVal = document.getElementById('filterMetaValue').value.trim();
     const filters = {};
     if (path) filters.path = path;
     if (type) filters.chunk_type = type;
+    if (metaKey && metaVal) filters[metaKey] = metaVal;
     return Object.keys(filters).length > 0 ? filters : {};
+}
+
+function getLanguageClass(path) {
+    const ext = (path || '').split('.').pop().toLowerCase();
+    const map = {py:'language-python', js:'language-javascript', jsx:'language-javascript',
+                 ts:'language-javascript', tsx:'language-javascript', json:'', jsonl:'',
+                 txt:'', text:'', csv:'', log:'', md:'', html:'language-html',
+                 css:'language-css', sh:'language-bash', bash:'language-bash',
+                 sql:'language-sql', yaml:'language-yaml', yml:'language-yaml'};
+    if (ext in map) return map[ext];
+    return 'language-python';
+}
+
+function highlightRegexInText(text, pattern) {
+    try {
+        const re = new RegExp(pattern, 'gm');
+        const parts = [];
+        let last = 0, match;
+        re.lastIndex = 0;
+        while ((match = re.exec(text)) !== null) {
+            parts.push(escapeHtml(text.slice(last, match.index)));
+            parts.push(`<mark class="regex-match">${escapeHtml(match[0])}</mark>`);
+            last = match.index + match[0].length;
+            if (match[0].length === 0) re.lastIndex++;
+        }
+        parts.push(escapeHtml(text.slice(last)));
+        return parts.join('');
+    } catch (e) {
+        return escapeHtml(text);
+    }
 }
 
 function showError(msg) {
@@ -558,6 +686,29 @@ function typeIcon(chunkType) {
     return icons[chunkType] || 'bi-question-circle';
 }
 
+const META_SKIP = new Set(['ingested_at']);
+
+function buildMetaPanel(metadata, uid) {
+    if (!metadata) return '';
+    const rows = Object.entries(metadata)
+        .filter(([k, v]) => !META_SKIP.has(k) && v !== null && v !== undefined && v !== '')
+        .map(([k, v]) => `
+            <tr>
+                <td class="text-muted small pe-2 text-nowrap align-top">${escapeHtml(k)}</td>
+                <td class="small font-monospace">${escapeHtml(String(v))}</td>
+            </tr>`).join('');
+    if (!rows) return '';
+    return `
+    <div class="meta-panel d-none" id="mp-${uid}"
+         style="background:var(--surface);border-top:1px solid var(--border);padding:0.5rem 1rem;">
+        <table class="table table-sm table-borderless mb-0"><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+function toggleMetaPanel(uid) {
+    document.getElementById('mp-' + uid).classList.toggle('d-none');
+}
+
 function renderResults(data, mode) {
     const container = document.getElementById('resultsContainer');
     document.getElementById('emptyState').classList.add('d-none');
@@ -590,13 +741,23 @@ function renderResults(data, mode) {
         const badge = scoreBadge(r.score, r.score_percentage);
         const icon = typeIcon(r.chunk_type);
         const symbol = r.symbol || 'Top-Level Code';
-        const highlights = (r.highlights && r.highlights.length > 0)
-            ? `<div class="mt-1">${r.highlights.map(h => `<code class="regex-highlight">${escapeHtml(h)}</code>`).join(' ')}</div>`
-            : '';
         const bookmarked = bookmarkedIds.has(r.id);
         const bmIcon = bookmarked ? 'bi-bookmark-fill text-warning' : 'bi-bookmark';
         const queryForBm = escapeHtml(data.query || data.pattern || '');
 
+        let bodyHtml;
+        if (mode === 'regex' && data.pattern) {
+            bodyHtml = `<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-word;">${highlightRegexInText(r.code, data.pattern)}</pre>`;
+        } else {
+            const langClass = getLanguageClass(r.path);
+            if (langClass) {
+                bodyHtml = `<pre class="mb-0"><code class="${langClass}" data-hljs="1">${escapeHtml(r.code)}</code></pre>`;
+            } else {
+                bodyHtml = `<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(r.code)}</pre>`;
+            }
+        }
+
+        const metaUid = r.id.replace(/[^a-z0-9]/gi, '_');
         html += `
         <div class="card mb-3 result-card">
             <div class="card-header d-flex align-items-center justify-content-between py-2">
@@ -608,6 +769,10 @@ function renderResults(data, mode) {
                     <span class="badge bg-dark ms-2">${r.lines}</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm p-0 border-0 text-muted" title="Show metadata"
+                            onclick="toggleMetaPanel('${metaUid}')">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
                     <button class="btn btn-sm p-0 border-0" title="${bookmarked ? 'Remove bookmark' : 'Bookmark this result'}"
                             onclick="toggleBookmark('${r.id}', '${escapeHtml(symbol)}', '${escapeHtml(r.path)}', '${queryForBm}', ${r.score}, this)">
                         <i class="bi ${bmIcon}"></i>
@@ -616,15 +781,15 @@ function renderResults(data, mode) {
                 </div>
             </div>
             <div class="card-body p-0">
-                ${highlights}
-                <pre class="mb-0"><code class="language-python">${escapeHtml(r.code)}</code></pre>
+                ${bodyHtml}
             </div>
+            ${buildMetaPanel(r.metadata, metaUid)}
         </div>`;
     }
 
     container.innerHTML = html;
     if (typeof hljs !== 'undefined') {
-        container.querySelectorAll('pre code').forEach(el => {
+        container.querySelectorAll('pre code[data-hljs]').forEach(el => {
             try { hljs.highlightElement(el); } catch(e) {}
         });
     }
@@ -660,6 +825,7 @@ async function doRegexSearch() {
     if (!pattern) { showError('Please enter a regex pattern.'); return; }
 
     const n = parseInt(document.getElementById('nRegexResults').value);
+    const filters = getFilters();
 
     showStatus('<span class="spinner-border spinner-border-sm me-2"></span>Searching...');
     document.getElementById('searchError').classList.add('d-none');
@@ -668,12 +834,12 @@ async function doRegexSearch() {
         const resp = await fetch(`${BASE_URL}/api/search/regex`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({pattern, collection: COLLECTION, n_results: n})
+            body: JSON.stringify({pattern, collection: COLLECTION, n_results: n, filters})
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error);
         renderResults(data, 'regex');
-        recordHistory(pattern, 'regex', data.total, data.time_ms, {});
+        recordHistory(pattern, 'regex', data.total, data.time_ms, filters);
     } catch (err) {
         showError(err.message);
     }
@@ -700,8 +866,187 @@ async function deleteCollection(name) {
     }
 }
 
-async function ingestDir() {
-    const path = document.getElementById('ingestPath').value.trim();
+let _ingestMode = 'dir';
+
+function switchIngestMode(mode) {
+    _ingestMode = mode;
+    document.getElementById('ingestDirPanel').classList.toggle('d-none', mode !== 'dir');
+    document.getElementById('ingestJsonPanel').classList.toggle('d-none', mode !== 'json');
+    document.getElementById('ingestDirBtn').classList.toggle('active', mode === 'dir');
+    document.getElementById('ingestJsonBtn').classList.toggle('active', mode === 'json');
+    document.getElementById('ingestError').classList.add('d-none');
+    document.getElementById('ingestSuccess').classList.add('d-none');
+    if (mode === 'dir') { closeIngestBrowser(); clearIngestFieldPicker(); }
+}
+
+// ── Ingest modal file browser ────────────────────────────────────────────────
+let _ingestBrowserOpen = false;
+
+function toggleIngestBrowser() {
+    if (_ingestBrowserOpen) { closeIngestBrowser(); return; }
+    _ingestBrowserOpen = true;
+    document.getElementById('ingestFileBrowser').classList.remove('d-none');
+    const startPath = document.getElementById('jsonFilePath').value.trim().replace(/\/[^/]+\.json$/i, '') || '';
+    loadIngestBrowser(startPath);
+}
+
+function closeIngestBrowser() {
+    _ingestBrowserOpen = false;
+    document.getElementById('ingestFileBrowser').classList.add('d-none');
+}
+
+function escHtmlIngest(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function loadIngestBrowser(path) {
+    const entriesEl = document.getElementById('ingestBrowserEntries');
+    const emptyEl   = document.getElementById('ingestBrowserEmpty');
+    const errorEl   = document.getElementById('ingestBrowserError');
+    const pathEl    = document.getElementById('ingestBrowserPath');
+    const upBtn     = document.getElementById('ingestBrowserUpBtn');
+
+    entriesEl.innerHTML = '<div class="text-muted small text-center py-3"><span class="spinner-border spinner-border-sm me-1"></span>Loading…</div>';
+    emptyEl.classList.add('d-none');
+    errorEl.classList.add('d-none');
+
+    try {
+        const resp = await fetch(`${BASE_URL}/api/browse?path=${encodeURIComponent(path)}`);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Browse failed');
+
+        pathEl.textContent    = data.current;
+        pathEl.dataset.path   = data.current;
+        upBtn.disabled        = !data.parent;
+        upBtn.dataset.parent  = data.parent || '';
+
+        entriesEl.innerHTML = '';
+        if (data.entries.length === 0) { emptyEl.classList.remove('d-none'); return; }
+
+        data.entries.forEach(entry => {
+            const row = document.createElement('button');
+            row.type = 'button';
+            row.className = 'browser-entry d-flex align-items-center gap-2 w-100 px-3 py-2 border-0 text-start';
+            row.style.background = 'transparent';
+            const icon = entry.type === 'dir' ? 'bi-folder-fill text-warning' : 'bi-filetype-json text-success';
+            row.innerHTML = `<i class="bi ${icon}"></i><span class="small font-monospace">${escHtmlIngest(entry.name)}</span>`;
+            if (entry.type === 'dir') {
+                row.onclick = () => loadIngestBrowser(entry.path);
+            } else {
+                row.onclick = () => {
+                    document.getElementById('jsonFilePath').value = entry.path;
+                    closeIngestBrowser();
+                    detectIngestFields();
+                };
+            }
+            entriesEl.appendChild(row);
+        });
+    } catch (err) {
+        entriesEl.innerHTML = '';
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('d-none');
+    }
+}
+
+function ingestBrowserUp() {
+    const parent = document.getElementById('ingestBrowserUpBtn').dataset.parent;
+    if (parent) loadIngestBrowser(parent);
+}
+
+// ── Ingest modal JSON field detection ───────────────────────────────────────
+let _ingestJsonFields = [];
+
+async function detectIngestFields() {
+    const path = document.getElementById('jsonFilePath').value.trim();
+    const errorEl = document.getElementById('ingestFieldDetectError');
+    errorEl.classList.add('d-none');
+
+    if (!path) {
+        errorEl.textContent = 'Enter a JSON file path first.';
+        errorEl.classList.remove('d-none');
+        return;
+    }
+
+    const picker = document.getElementById('ingestFieldPicker');
+    const tbody  = document.getElementById('ingestFieldRows');
+    picker.classList.remove('d-none');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span>Reading fields…</td></tr>';
+
+    try {
+        const resp = await fetch(`${BASE_URL}/api/json_preview?path=${encodeURIComponent(path)}`);
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error);
+
+        _ingestJsonFields = data.fields;
+        document.getElementById('ingestPickerTitle').textContent = path.split('/').pop();
+        document.getElementById('ingestRecordCount').textContent = `${data.total_records} records`;
+
+        const dl = document.getElementById('ingestIdFieldList');
+        dl.innerHTML = data.fields.map(f => `<option value="${escHtmlIngest(f.name)}">`).join('');
+
+        renderIngestFieldPicker(data.fields);
+    } catch (err) {
+        picker.classList.add('d-none');
+        errorEl.textContent = err.message;
+        errorEl.classList.remove('d-none');
+        _ingestJsonFields = [];
+    }
+}
+
+function renderIngestFieldPicker(fields) {
+    const preferred = ['text', 'content', 'body', 'message', 'description'];
+    const defaultText = fields.find(f => preferred.includes(f.name.toLowerCase()))?.name ?? fields[0]?.name;
+
+    document.getElementById('ingestFieldRows').innerHTML = fields.map(f => {
+        const isDefault = f.name === defaultText;
+        return `<tr>
+            <td class="ps-3">
+                <input type="radio" name="ingestTextRadio" value="${escHtmlIngest(f.name)}"
+                       class="form-check-input mt-0" ${isDefault ? 'checked' : ''}
+                       onchange="onIngestTextFieldChange()">
+            </td>
+            <td>
+                <input type="checkbox" class="form-check-input mt-0 ingest-meta-cb"
+                       data-field="${escHtmlIngest(f.name)}"
+                       ${isDefault ? 'disabled style="opacity:.35"' : 'checked'}>
+            </td>
+            <td class="font-monospace fw-medium" style="color:var(--text-1);white-space:nowrap;">${escHtmlIngest(f.name)}</td>
+            <td class="pe-3 text-muted text-truncate" style="max-width:200px;">${escHtmlIngest(f.sample)}</td>
+        </tr>`;
+    }).join('');
+}
+
+function onIngestTextFieldChange() {
+    const selected = document.querySelector('input[name="ingestTextRadio"]:checked')?.value;
+    document.querySelectorAll('.ingest-meta-cb').forEach(cb => {
+        const isText = cb.dataset.field === selected;
+        cb.disabled = isText;
+        cb.style.opacity = isText ? '.35' : '';
+        if (isText) cb.checked = false;
+    });
+}
+
+function clearIngestFieldPicker() {
+    _ingestJsonFields = [];
+    document.getElementById('ingestFieldPicker').classList.add('d-none');
+    document.getElementById('ingestFieldDetectError').classList.add('d-none');
+}
+
+function getIngestJsonParams() {
+    if (_ingestJsonFields.length === 0) {
+        return { text_field: 'text', metadata_fields: null, id_field: null };
+    }
+    const textField  = document.querySelector('input[name="ingestTextRadio"]:checked')?.value ?? 'text';
+    const metaFields = [...document.querySelectorAll('.ingest-meta-cb:checked')].map(cb => cb.dataset.field);
+    const idField    = document.getElementById('ingestIdField')?.value.trim() || null;
+    return {
+        text_field: textField,
+        metadata_fields: metaFields.length > 0 ? metaFields : null,
+        id_field: idField,
+    };
+}
+
+async function doIngest() {
     const errorEl = document.getElementById('ingestError');
     const successEl = document.getElementById('ingestSuccess');
     const spinner = document.getElementById('ingestSpinner');
@@ -709,27 +1054,43 @@ async function ingestDir() {
 
     errorEl.classList.add('d-none');
     successEl.classList.add('d-none');
-
-    if (!path) {
-        errorEl.textContent = 'Directory path is required';
-        errorEl.classList.remove('d-none');
-        return;
-    }
-
     spinner.classList.remove('d-none');
     btn.disabled = true;
 
     try {
-        const resp = await fetch(`${BASE_URL}/api/collections/${COLLECTION}/ingest`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({directory: path})
-        });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error);
+        if (_ingestMode === 'dir') {
+            const path = document.getElementById('ingestPath').value.trim();
+            if (!path) throw new Error('Directory path is required');
 
-        const p = data.progress;
-        successEl.textContent = `Ingested ${p.total_chunks} chunks from ${p.processed_files} files.`;
+            const resp = await fetch(`${BASE_URL}/api/collections/${COLLECTION}/ingest`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({directory: path})
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error);
+
+            const p = data.progress;
+            successEl.textContent = `Ingested ${p.total_chunks} chunks from ${p.processed_files} files.`;
+        } else {
+            const filePath = document.getElementById('jsonFilePath').value.trim();
+            if (!filePath) throw new Error('JSON file path is required');
+
+            const { text_field, metadata_fields, id_field } = getIngestJsonParams();
+
+            const resp = await fetch(`${BASE_URL}/api/collections/${COLLECTION}/ingest_json`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({file_path: filePath, text_field, metadata_fields, id_field})
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error);
+
+            const r = data.result;
+            successEl.textContent = `Ingested ${r.total_ingested} records from ${r.source}` +
+                (r.failed ? ` (${r.failed} skipped)` : '') + '.';
+        }
+
         successEl.classList.remove('d-none');
         setTimeout(() => location.reload(), 1500);
     } catch (err) {
@@ -1877,8 +2238,26 @@ function renderFiles(files) {
 }
 
 // Auto-start tutorial on first visit
+// Sync mode-toggle active state with Bootstrap pill tabs
+document.querySelectorAll('#collectionModeToggle .mode-btn').forEach(btn => {
+    btn.addEventListener('shown.bs.tab', () => {
+        document.querySelectorAll('#collectionModeToggle .mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    });
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     TutorialEngine.start('collection');
+    // Populate metadata field suggestions for the filter datalist
+    fetch(`${BASE_URL}/api/collections/${encodeURIComponent(COLLECTION)}/metadata_keys`)
+        .then(r => r.json())
+        .then(data => {
+            const dl = document.getElementById('collFieldSuggestions');
+            if (dl && data.keys) {
+                dl.innerHTML = data.keys.map(k => `<option value="${escapeHtml(k)}">`).join('');
+            }
+        })
+        .catch(() => {});
 });
 </script>
 {% endblock %}

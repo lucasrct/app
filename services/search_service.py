@@ -4,6 +4,7 @@ import logging
 import re
 import time
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from typing import List, Optional, Dict, Any
 
@@ -14,6 +15,10 @@ logger = logging.getLogger(__name__)
 from models.chunk import Chunk, ChunkMetadata
 from models.search_result import SearchResult, SearchResultSet
 from config import get_config
+
+
+class RegexTimeoutError(Exception):
+    """Raised when a regex search exceeds its configured time limit."""
 
 
 class SearchStrategy(ABC):
@@ -29,6 +34,38 @@ class SearchStrategy(ABC):
     def validate_query(self, query: str) -> tuple:
         """Validate a query string. Returns (is_valid, error_message)."""
         ...
+
+    @staticmethod
+    def _build_where_clause(filters: Dict) -> Optional[Dict]:
+        """Build a ChromaDB where clause using only $eq operators (get/query compatible).
+
+        path and symbol are excluded here — they require Python-side substring matching
+        because ChromaDB's metadata where clause does not support $contains.
+        """
+        conditions = []
+        if filters.get("chunk_type"):
+            conditions.append({"chunk_type": {"$eq": filters["chunk_type"]}})
+        for k, v in filters.items():
+            if k not in {"path", "chunk_type", "symbol"} and v:
+                conditions.append({k: {"$eq": str(v)}})
+        if not conditions:
+            return None
+        if len(conditions) == 1:
+            return conditions[0]
+        return {"$and": conditions}
+
+    @staticmethod
+    def _apply_substring_filters(results: list, filters: Dict) -> list:
+        """Post-filter results for path and symbol substring matching."""
+        path_sub = (filters.get("path") or "").lower()
+        symbol_sub = (filters.get("symbol") or "").lower()
+        if not path_sub and not symbol_sub:
+            return results
+        return [
+            r for r in results
+            if (not path_sub or path_sub in (r.chunk.metadata.path or "").lower())
+            and (not symbol_sub or symbol_sub in (r.chunk.metadata.symbol or "").lower())
+        ]
 
 
 class SemanticSearchStrategy(SearchStrategy):
@@ -75,6 +112,11 @@ class SemanticSearchStrategy(SearchStrategy):
             )
             results.append(result)
 
+        if filters:
+            results = self._apply_substring_filters(results, filters)
+        for i, r in enumerate(results):
+            r.rank = i + 1
+
         logger.info(f"Semantic search completed: {len(results)} results in {elapsed_ms:.1f}ms")
 
         return SearchResultSet(
@@ -83,22 +125,6 @@ class SemanticSearchStrategy(SearchStrategy):
             total_time_ms=elapsed_ms,
             collection_name=collection.name,
         )
-
-    @staticmethod
-    def _build_where_clause(filters: Dict) -> Optional[Dict]:
-        """Build a ChromaDB where clause from filter parameters."""
-        conditions = []
-        if "path" in filters and filters["path"]:
-            conditions.append({"path": {"$contains": filters["path"]}})
-        if "chunk_type" in filters and filters["chunk_type"]:
-            conditions.append({"chunk_type": {"$eq": filters["chunk_type"]}})
-        if "symbol" in filters and filters["symbol"]:
-            conditions.append({"symbol": {"$eq": filters["symbol"]}})
-        if not conditions:
-            return None
-        if len(conditions) == 1:
-            return conditions[0]
-        return {"$and": conditions}
 
 
 class RegexSearchStrategy(SearchStrategy):
@@ -119,7 +145,8 @@ class RegexSearchStrategy(SearchStrategy):
         return True, ""
 
     def search(self, collection: chromadb.Collection, query: str,
-               n_results: int = 50, filters: Optional[Dict] = None) -> SearchResultSet:
+               n_results: int = 50, filters: Optional[Dict] = None,
+               timeout_seconds: Optional[float] = None) -> SearchResultSet:
         logger.info(f"Regex search: pattern='{query[:80]}' collection={collection.name}")
         start = time.time()
 
@@ -129,12 +156,25 @@ class RegexSearchStrategy(SearchStrategy):
             logger.warning(f"Invalid regex pattern: {e}")
             return SearchResultSet(query=query)
 
-        # Use ChromaDB's native full-text search with $regex operator.
-        # This filters server-side instead of pulling all documents.
-        matched_data = collection.get(
-            where_document={"$regex": query},
-            include=["documents", "metadatas"],
-        )
+        where_clause = self._build_where_clause(filters) if filters else None
+        get_kwargs: Dict[str, Any] = {
+            "where_document": {"$regex": query},
+            "include": ["documents", "metadatas"],
+        }
+        if where_clause:
+            get_kwargs["where"] = where_clause
+
+        timeout_s = timeout_seconds if timeout_seconds is not None else get_config().search.regex_timeout_seconds
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(collection.get, **get_kwargs)
+            try:
+                matched_data = future.result(timeout=timeout_s)
+            except FuturesTimeoutError:
+                raise RegexTimeoutError(
+                    f"Regex search timed out after {timeout_s:.0f}s — "
+                    "for a very broad pattern over a large codebase, consider narrowing the search instead of waiting. "
+                    "Note that this is separate from the result cap, which limits how many matches a single search returns."
+                )
 
         # Extract highlights and compute scores on the filtered results
         results = []
@@ -148,7 +188,6 @@ class RegexSearchStrategy(SearchStrategy):
                 document=doc,
                 metadata=matched_data["metadatas"][i],
             )
-            # Score: more matches = more relevant (inverted for distance convention)
             score = 1.0 / (1.0 + match_count)
             highlights = [m.group(0) for m in matches[:5]]
             results.append(SearchResult(
@@ -156,6 +195,9 @@ class RegexSearchStrategy(SearchStrategy):
                 score=score,
                 highlights=highlights,
             ))
+
+        if filters:
+            results = self._apply_substring_filters(results, filters)
 
         # Sort by relevance (most matches first = lowest score)
         results.sort(key=lambda r: r.score)
@@ -172,17 +214,72 @@ class RegexSearchStrategy(SearchStrategy):
         )
 
 
+class MetadataSearchStrategy(SearchStrategy):
+    """Pure metadata filter search — no query text, no embeddings.
+
+    Uses ChromaDB's where clause to filter chunks by path, chunk_type,
+    and/or symbol. Results are ordered by path then start_line.
+    At least one filter must be provided.
+    """
+
+    def validate_query(self, query: str) -> tuple:
+        return True, ""
+
+    def search(self, collection: chromadb.Collection, query: str,
+               n_results: int = 200, filters: Optional[Dict] = None) -> SearchResultSet:
+        logger.info(f"Metadata search: filters={filters} collection={collection.name}")
+        start = time.time()
+
+        where_clause = self._build_where_clause(filters or {})
+
+        get_kwargs: Dict[str, Any] = {"include": ["documents", "metadatas"]}
+        if where_clause:
+            get_kwargs["where"] = where_clause
+        get_kwargs["limit"] = n_results
+
+        data = collection.get(**get_kwargs)
+        elapsed_ms = (time.time() - start) * 1000
+
+        results = []
+        for i in range(len(data["ids"])):
+            chunk = Chunk.from_chroma_result(
+                id=data["ids"][i],
+                document=data["documents"][i],
+                metadata=data["metadatas"][i],
+            )
+            results.append(SearchResult(chunk=chunk, score=0.0, rank=i + 1))
+
+        if filters:
+            results = self._apply_substring_filters(results, filters)
+
+        # Sort by path then line number for predictable ordering
+        results.sort(key=lambda r: (r.chunk.metadata.path, r.chunk.metadata.start_line))
+        for i, r in enumerate(results):
+            r.rank = i + 1
+
+        logger.info(f"Metadata search: {len(results)} results in {elapsed_ms:.1f}ms")
+        return SearchResultSet(
+            results=results,
+            query=query,
+            total_time_ms=elapsed_ms,
+            collection_name=collection.name,
+        )
+
+
 @dataclass
 class SearchService:
     """Facade that dispatches to the appropriate search strategy."""
     semantic: SemanticSearchStrategy = None
     regex: RegexSearchStrategy = None
+    metadata: MetadataSearchStrategy = None
 
     def __post_init__(self):
         if self.semantic is None:
             self.semantic = SemanticSearchStrategy()
         if self.regex is None:
             self.regex = RegexSearchStrategy()
+        if self.metadata is None:
+            self.metadata = MetadataSearchStrategy()
 
     def semantic_search(self, collection: chromadb.Collection, query: str,
                         n_results: int = 10, filters: Optional[Dict] = None) -> SearchResultSet:
@@ -190,14 +287,22 @@ class SearchService:
         return self.semantic.search(collection, query, n_results, filters)
 
     def regex_search(self, collection: chromadb.Collection, pattern: str,
-                     n_results: int = 50, filters: Optional[Dict] = None) -> SearchResultSet:
+                     n_results: int = 50, filters: Optional[Dict] = None,
+                     timeout_seconds: Optional[float] = None) -> SearchResultSet:
         """Perform a regex pattern search."""
-        return self.regex.search(collection, pattern, n_results, filters)
+        return self.regex.search(collection, pattern, n_results, filters, timeout_seconds)
+
+    def metadata_search(self, collection: chromadb.Collection,
+                        filters: Optional[Dict] = None,
+                        n_results: int = 200) -> SearchResultSet:
+        """Filter chunks by metadata fields without a query."""
+        return self.metadata.search(collection, query="", filters=filters, n_results=n_results)
 
     def get_strategy(self, mode: str) -> SearchStrategy:
         """Get the search strategy by name."""
         strategies = {
             "semantic": self.semantic,
             "regex": self.regex,
+            "metadata": self.metadata,
         }
         return strategies.get(mode, self.semantic)

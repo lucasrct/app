@@ -55,6 +55,9 @@ app/
 ├── config.py               # Dataclass-based configuration (env vars, defaults)
 ├── requirements.txt        # Python dependencies
 ├── .env.example            # Environment variable template
+├── ARCHITECTURE.md         # System architecture and design overview
+├── CHANGELOG.md            # Version history and release notes
+├── CONTRIBUTING.md         # Contribution guidelines and conventions
 │
 ├── models/                 # Data models
 │   ├── chunk.py            # Chunk, ChunkMetadata, ChunkType
@@ -71,7 +74,9 @@ app/
 │   ├── suggestions.py      # Smart query suggestions
 │   ├── statistics.py       # Code metrics and analytics
 │   ├── visualizer.py       # 2-D embedding visualization
-│   └── tutorial.py         # Interactive guided tours
+│   ├── tutorial.py         # Interactive guided tours
+│   ├── diff.py             # Collection diff endpoints
+│   └── export.py           # Collection export endpoints (CSV/JSON)
 │
 ├── services/               # Business logic layer
 │   ├── chroma_client.py    # ChromaDB connection manager (singleton)
@@ -82,7 +87,9 @@ app/
 │   ├── statistics_service.py   # Code metrics and analysis
 │   ├── visualization_service.py # Dimensionality reduction for the 2-D view
 │   ├── suggestion_service.py   # Multi-strategy suggestion generator
-│   └── tutorial_service.py     # Tutorial builder and manager
+│   ├── tutorial_service.py     # Tutorial builder and manager
+│   ├── diff_service.py         # Collection comparison logic
+│   └── export_service.py       # Collection export logic (CSV/JSON)
 │
 ├── utils/                  # Utilities and helpers
 │   ├── validators.py       # Input validation (queries, paths, regex)
@@ -98,8 +105,18 @@ app/
 │   ├── explorer.html       # Chunk browser
 │   └── collection.html     # Collection detail page
 │
-└── static/
-    └── css/style.css       # Custom styles
+├── static/
+│   └── css/style.css       # Custom styles
+│
+├── docs/                   # Documentation
+│   ├── api-reference.md    # Full API endpoint reference
+│   ├── configuration.md    # Configuration reference
+│   ├── development.md      # Local development guide
+│   └── troubleshooting.md  # Common issues and fixes
+│
+└── notes/                  # Developer notes
+    ├── design-decisions.txt  # Design decision log
+    └── performance-notes.txt # Performance observations and notes
 ```
 
 The app starts on `http://localhost:5000` by default. Navigate to that URL in a browser to access the UI.

@@ -64,6 +64,7 @@ class SearchResult:
             "chunk_type": self.chunk.metadata.chunk_type,
             "rank": self.rank,
             "highlights": self.highlights,
+            "metadata": self.chunk.raw_metadata,
         }
 
 

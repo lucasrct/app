@@ -25,25 +25,22 @@
                     </select>
                 </div>
 
-                <!-- Search Mode Tabs -->
-                <ul class="nav nav-pills mb-3" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#semanticTab"
-                                type="button" role="tab" id="semanticTabBtn">
-                            <i class="bi bi-chat-dots me-1"></i>Semantic
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#regexTab"
-                                type="button" role="tab" id="regexTabBtn">
-                            <i class="bi bi-regex me-1"></i>Regex
-                        </button>
-                    </li>
-                </ul>
+                <!-- Search Mode Toggle -->
+                <div class="mode-toggle mb-3" id="searchModeToggle">
+                    <button class="mode-btn active" type="button" id="semanticTabBtn" data-tab="semanticTab">
+                        <i class="bi bi-chat-dots me-1"></i>Semantic
+                    </button>
+                    <button class="mode-btn" type="button" id="regexTabBtn" data-tab="regexTab">
+                        <i class="bi bi-regex me-1"></i>Regex
+                    </button>
+                    <button class="mode-btn" type="button" id="metadataTabBtn" data-tab="metadataTab">
+                        <i class="bi bi-funnel me-1"></i>Metadata
+                    </button>
+                </div>
 
-                <div class="tab-content">
+                <div>
                     <!-- Semantic Search -->
-                    <div class="tab-pane fade show active" id="semanticTab" role="tabpanel">
+                    <div id="semanticTab">
                         <div class="mb-3">
                             <label for="semanticQuery" class="form-label">Query</label>
                             <textarea class="form-control" id="semanticQuery" rows="3"
@@ -57,13 +54,13 @@
                                    min="1" max="30" value="10"
                                    oninput="document.getElementById('nResultsLabel').textContent=this.value">
                         </div>
-                        <button class="btn btn-success w-100" onclick="doSemanticSearch()">
+                        <button class="btn btn-semantic w-100" onclick="doSemanticSearch()">
                             <i class="bi bi-search me-1"></i>Search
                         </button>
                     </div>
 
                     <!-- Regex Search -->
-                    <div class="tab-pane fade" id="regexTab" role="tabpanel">
+                    <div id="regexTab" class="d-none">
                         <div class="mb-3">
                             <label for="regexPattern" class="form-label">Pattern</label>
                             <input type="text" class="form-control font-monospace" id="regexPattern"
@@ -77,16 +74,44 @@
                                    min="1" max="50" value="20"
                                    oninput="document.getElementById('nRegexResultsLabel').textContent=this.value">
                         </div>
-                        <button class="btn btn-warning w-100" onclick="doRegexSearch()">
+                        <div class="mb-3">
+                            <label for="regexTimeout" class="form-label">
+                                Timeout: <span id="regexTimeoutLabel">5</span>s
+                                <i class="bi bi-info-circle text-muted ms-1" title="How long the search runs before the app stops it. For a very broad pattern over a large codebase, consider narrowing the search instead of waiting. Note that this is separate from the result cap." data-bs-toggle="tooltip"></i>
+                            </label>
+                            <input type="range" class="form-range" id="regexTimeout"
+                                   min="5" max="60" step="5" value="5"
+                                   oninput="document.getElementById('regexTimeoutLabel').textContent=this.value">
+                        </div>
+                        <button class="btn btn-regex w-100" onclick="doRegexSearch()">
                             <i class="bi bi-regex me-1"></i>Search
+                        </button>
+                    </div>
+
+                    <!-- Metadata Filter Search -->
+                    <div id="metadataTab" class="d-none">
+                        <p class="text-muted small mb-3">Filter by metadata — no query needed. Select a collection to see available fields.</p>
+                        <div id="metaFieldsContainer" class="mb-3">
+                            <p class="text-muted small fst-italic">Select a collection above to load its fields.</p>
+                        </div>
+                        <div class="mb-3">
+                            <label for="nMetaResults" class="form-label small">
+                                Max Results: <span id="nMetaResultsLabel">50</span>
+                            </label>
+                            <input type="range" class="form-range form-range-sm" id="nMetaResults"
+                                   min="10" max="200" step="10" value="50"
+                                   oninput="document.getElementById('nMetaResultsLabel').textContent=this.value">
+                        </div>
+                        <button class="btn btn-metadata w-100" onclick="doMetadataSearch()">
+                            <i class="bi bi-funnel me-1"></i>Filter
                         </button>
                     </div>
                 </div>
 
-                <!-- Filters (shared) -->
+                <!-- Filters for Semantic / Regex (shared) -->
                 <hr>
-                <details>
-                    <summary class="fw-bold mb-2">Filters</summary>
+                <details id="sharedFiltersSection">
+                    <summary class="fw-bold mb-2">Filters <span class="text-muted small">(Semantic &amp; Regex)</span></summary>
                     <div class="mb-2">
                         <label for="filterPath" class="form-label small">File Path Contains</label>
                         <input type="text" class="form-control form-control-sm" id="filterPath"
@@ -99,7 +124,20 @@
                             <option value="function_definition">Function</option>
                             <option value="class_definition">Class</option>
                             <option value="gap">Top-Level Code</option>
+                            <option value="json_record">JSON Record</option>
                         </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Metadata Field (exact match)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control font-monospace" id="filterMetaKey"
+                                   list="sharedFieldSuggestions" placeholder="field" style="max-width:120px;">
+                            <span class="input-group-text px-1">=</span>
+                            <input type="text" class="form-control" id="filterMetaValue"
+                                   placeholder="value">
+                        </div>
+                        <datalist id="sharedFieldSuggestions"></datalist>
+                        <div class="form-text">e.g. field&nbsp;<code>from_email</code>, value&nbsp;<code>alice@example.com</code></div>
                     </div>
                 </details>
             </div>
@@ -126,10 +164,43 @@
 function getFilters() {
     const path = document.getElementById('filterPath').value.trim();
     const type = document.getElementById('filterType').value;
+    const metaKey = document.getElementById('filterMetaKey').value.trim();
+    const metaVal = document.getElementById('filterMetaValue').value.trim();
     const filters = {};
     if (path) filters.path = path;
     if (type) filters.chunk_type = type;
+    if (metaKey && metaVal) filters[metaKey] = metaVal;
     return Object.keys(filters).length > 0 ? filters : {};
+}
+
+function getLanguageClass(path) {
+    const ext = (path || '').split('.').pop().toLowerCase();
+    const map = {py:'language-python', js:'language-javascript', jsx:'language-javascript',
+                 ts:'language-javascript', tsx:'language-javascript', json:'', jsonl:'',
+                 txt:'', text:'', csv:'', log:'', md:'', html:'language-html',
+                 css:'language-css', sh:'language-bash', bash:'language-bash',
+                 sql:'language-sql', yaml:'language-yaml', yml:'language-yaml'};
+    if (ext in map) return map[ext];
+    return 'language-python';
+}
+
+function highlightRegexInText(text, pattern) {
+    try {
+        const re = new RegExp(pattern, 'gm');
+        const parts = [];
+        let last = 0, match;
+        re.lastIndex = 0;
+        while ((match = re.exec(text)) !== null) {
+            parts.push(escapeHtml(text.slice(last, match.index)));
+            parts.push(`<mark class="regex-match">${escapeHtml(match[0])}</mark>`);
+            last = match.index + match[0].length;
+            if (match[0].length === 0) re.lastIndex++;
+        }
+        parts.push(escapeHtml(text.slice(last)));
+        return parts.join('');
+    } catch (e) {
+        return escapeHtml(text);
+    }
 }
 
 function getCollection() {
@@ -173,6 +244,49 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
+// ── Metadata panel helpers ────────────────────────────────────────────────────
+const META_SKIP = new Set(['ingested_at']);
+
+function buildMetaPanel(metadata, uid) {
+    if (!metadata) return '';
+    const rows = Object.entries(metadata)
+        .filter(([k, v]) => !META_SKIP.has(k) && v !== null && v !== undefined && v !== '')
+        .map(([k, v]) => `
+            <tr>
+                <td class="text-muted small pe-2 text-nowrap align-top">${escapeHtml(k)}</td>
+                <td class="small font-monospace">${escapeHtml(String(v))}</td>
+                <td class="align-top ps-2">
+                    <button class="btn btn-sm p-0 border-0 text-muted" title="Filter by this"
+                            onclick="searchByMeta(${JSON.stringify(k)}, ${JSON.stringify(String(v))})">
+                        <i class="bi bi-funnel-fill" style="font-size:0.7rem;"></i>
+                    </button>
+                </td>
+            </tr>`).join('');
+    if (!rows) return '';
+    return `
+    <div class="meta-panel d-none" id="mp-${uid}"
+         style="background:var(--surface);border-top:1px solid var(--border);padding:0.5rem 1rem;">
+        <table class="table table-sm table-borderless mb-0"><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+function toggleMetaPanel(uid) {
+    document.getElementById('mp-' + uid).classList.toggle('d-none');
+}
+
+async function searchByMeta(field, value) {
+    const col = getCollection();
+    if (!col) { showError('Please select a collection first.'); return; }
+    switchSearchTab('metadataTab');
+    await loadMetadataFields(col);
+    const input = document.querySelector(`#metaFieldsContainer .meta-field-input[data-key="${CSS.escape(field)}"]`);
+    if (input) {
+        input.value = value;
+        input.closest('.mb-2').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+    doMetadataSearch();
+}
+
 function renderResults(data, mode) {
     const container = document.getElementById('resultsContainer');
     document.getElementById('emptyState').classList.add('d-none');
@@ -197,10 +311,20 @@ function renderResults(data, mode) {
         const badge = scoreBadge(r.score, r.score_percentage);
         const icon = typeIcon(r.chunk_type);
         const symbol = r.symbol || 'Top-Level Code';
-        const highlights = (r.highlights && r.highlights.length > 0)
-            ? `<div class="mt-1">${r.highlights.map(h => `<code class="regex-highlight">${escapeHtml(h)}</code>`).join(' ')}</div>`
-            : '';
 
+        let bodyHtml;
+        if (mode === 'regex' && data.pattern) {
+            bodyHtml = `<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-word;">${highlightRegexInText(r.code, data.pattern)}</pre>`;
+        } else {
+            const langClass = getLanguageClass(r.path);
+            if (langClass) {
+                bodyHtml = `<pre class="mb-0"><code class="${langClass}" data-hljs="1">${escapeHtml(r.code)}</code></pre>`;
+            } else {
+                bodyHtml = `<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(r.code)}</pre>`;
+            }
+        }
+
+        const metaUid = r.id.replace(/[^a-z0-9]/gi, '_');
         html += `
         <div class="card mb-3 result-card">
             <div class="card-header d-flex align-items-center justify-content-between py-2">
@@ -211,20 +335,24 @@ function renderResults(data, mode) {
                     <span class="text-muted ms-2 small">${escapeHtml(r.path)}</span>
                     <span class="badge bg-dark ms-2">${r.lines}</span>
                 </div>
-                <span class="text-muted small">#${r.rank}</span>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm p-0 border-0 text-muted" title="Show metadata"
+                            onclick="toggleMetaPanel('${metaUid}')">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                    <span class="text-muted small">#${r.rank}</span>
+                </div>
             </div>
             <div class="card-body p-0">
-                ${highlights}
-                <pre class="mb-0"><code class="language-python">${escapeHtml(r.code)}</code></pre>
+                ${bodyHtml}
             </div>
+            ${buildMetaPanel(r.metadata, metaUid)}
         </div>`;
     }
 
     container.innerHTML = html;
-
-    // Apply syntax highlighting (with fallback if CDN didn't load)
     if (typeof hljs !== 'undefined') {
-        container.querySelectorAll('pre code').forEach(el => {
+        container.querySelectorAll('pre code[data-hljs]').forEach(el => {
             try { hljs.highlightElement(el); } catch(e) {}
         });
     }
@@ -265,6 +393,8 @@ async function doRegexSearch() {
     if (!pattern) { showError('Please enter a regex pattern.'); return; }
 
     const n = parseInt(document.getElementById('nRegexResults').value);
+    const timeoutS = parseInt(document.getElementById('regexTimeout').value);
+    const filters = getFilters();
 
     showStatus('<span class="spinner-border spinner-border-sm me-2"></span>Searching...');
     document.getElementById('searchError').classList.add('d-none');
@@ -273,15 +403,181 @@ async function doRegexSearch() {
         const resp = await fetch(`${BASE_URL}/api/search/regex`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({pattern, collection, n_results: n})
+            body: JSON.stringify({pattern, collection, n_results: n, timeout_seconds: timeoutS, filters})
         });
         const data = await resp.json();
+        if (resp.status === 408) { showError(data.message); return; }
         if (!resp.ok) throw new Error(data.error);
         renderResults(data, 'regex');
     } catch (err) {
         showError(err.message);
     }
 }
+
+async function loadMetadataFields(collection) {
+    const container = document.getElementById('metaFieldsContainer');
+    if (!collection) {
+        container.innerHTML = '<p class="text-muted small fst-italic">Select a collection above to load its fields.</p>';
+        return;
+    }
+    container.innerHTML = '<p class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading fields…</p>';
+    try {
+        const resp = await fetch(`${BASE_URL}/api/collections/${encodeURIComponent(collection)}/metadata_keys`);
+        const data = await resp.json();
+        if (!resp.ok || !data.keys || data.keys.length === 0) {
+            container.innerHTML = '<p class="text-muted small fst-italic">No metadata fields found.</p>';
+            return;
+        }
+        // Also populate shared filters datalist
+        const dl = document.getElementById('sharedFieldSuggestions');
+        if (dl) dl.innerHTML = data.keys.map(k => `<option value="${escapeHtml(k)}">`).join('');
+
+        container.innerHTML = data.keys.map(k => {
+            const isSubstring = (k === 'path' || k === 'symbol');
+            const hint = isSubstring ? 'substring' : 'exact';
+            return `<div class="mb-2">
+                <label class="form-label small fw-bold">${escapeHtml(k)} <span class="text-muted fw-normal">(${hint})</span></label>
+                <input type="text" class="form-control form-control-sm meta-field-input"
+                       data-key="${escapeHtml(k)}" placeholder="filter by ${escapeHtml(k)}">
+            </div>`;
+        }).join('');
+    } catch (err) {
+        container.innerHTML = '<p class="text-danger small">Failed to load fields.</p>';
+    }
+}
+
+async function doMetadataSearch() {
+    const collection = getCollection();
+    if (!collection) { showError('Please select a collection.'); return; }
+
+    const filters = {};
+    document.querySelectorAll('#metaFieldsContainer .meta-field-input').forEach(input => {
+        const val = input.value.trim();
+        if (val) filters[input.dataset.key] = val;
+    });
+
+    if (Object.keys(filters).length === 0) {
+        showError('Enter at least one filter value.');
+        return;
+    }
+
+    const n = parseInt(document.getElementById('nMetaResults').value);
+
+    showStatus('<span class="spinner-border spinner-border-sm me-2"></span>Filtering...');
+    document.getElementById('searchError').classList.add('d-none');
+
+    try {
+        const resp = await fetch(`${BASE_URL}/api/search/metadata`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({collection, filters, n_results: n})
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error);
+        renderMetadataResults(data);
+    } catch (err) {
+        showError(err.message);
+    }
+}
+
+function renderMetadataResults(data) {
+    const container = document.getElementById('resultsContainer');
+    document.getElementById('emptyState').classList.add('d-none');
+
+    // Build a human-readable filter summary
+    const substrFields = new Set(['path', 'symbol']);
+    const parts = Object.entries(data.filters).map(([k, v]) =>
+        substrFields.has(k)
+            ? `${escapeHtml(k)} contains <code>${escapeHtml(v)}</code>`
+            : `${escapeHtml(k)} = <code>${escapeHtml(v)}</code>`
+    );
+    const filterSummary = parts.join(' &amp; ');
+
+    if (data.results.length === 0) {
+        showStatus(`<span class="text-warning">No chunks matched ${filterSummary}</span>`);
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-funnel display-4"></i>
+                <p class="mt-2">No chunks matched the given filters.</p>
+            </div>`;
+        return;
+    }
+
+    showStatus(`
+        <span class="text-info fw-bold">${data.total} chunks</span>
+        in <span class="text-muted">${data.time_ms}ms</span>
+        &mdash; ${filterSummary}
+    `);
+
+    let html = '';
+    for (const r of data.results) {
+        const icon = typeIcon(r.chunk_type);
+        const symbol = r.symbol || 'Top-Level Code';
+        const typeLabel = {
+            'function_definition': 'fn',
+            'class_definition': 'class',
+            'gap': 'module',
+        }[r.chunk_type] || r.chunk_type;
+
+        const langClass = getLanguageClass(r.path);
+        const codeBody = langClass
+            ? `<pre class="mb-0"><code class="${langClass}" data-hljs="1">${escapeHtml(r.code)}</code></pre>`
+            : `<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(r.code)}</pre>`;
+
+        const metaUid = r.id.replace(/[^a-z0-9]/gi, '_');
+        html += `
+        <div class="card mb-2 result-card">
+            <div class="card-header d-flex align-items-center justify-content-between py-2">
+                <div>
+                    <span class="badge bg-secondary me-1">${escapeHtml(typeLabel)}</span>
+                    <i class="bi ${icon} ms-1 me-1"></i>
+                    <strong>${escapeHtml(symbol)}</strong>
+                    <span class="text-muted ms-2 small">${escapeHtml(r.path)}</span>
+                    <span class="badge bg-dark ms-2">${r.lines}</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="btn btn-sm p-0 border-0 text-muted" title="Show metadata"
+                            onclick="toggleMetaPanel('${metaUid}')">
+                        <i class="bi bi-info-circle"></i>
+                    </button>
+                    <span class="text-muted small">#${r.rank}</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                ${codeBody}
+            </div>
+            ${buildMetaPanel(r.metadata, metaUid)}
+        </div>`;
+    }
+
+    container.innerHTML = html;
+    if (typeof hljs !== 'undefined') {
+        container.querySelectorAll('pre code[data-hljs]').forEach(el => {
+            try { hljs.highlightElement(el); } catch(e) {}
+        });
+    }
+}
+
+// ── Manual tab switching (avoids Bootstrap pill-tab quirks outside .nav) ──────
+const SEARCH_TAB_IDS = ['semanticTab', 'regexTab', 'metadataTab'];
+
+function switchSearchTab(tabId) {
+    SEARCH_TAB_IDS.forEach(id => document.getElementById(id).classList.toggle('d-none', id !== tabId));
+    document.querySelectorAll('#searchModeToggle .mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
+    document.getElementById('sharedFiltersSection').style.display = tabId === 'metadataTab' ? 'none' : '';
+    if (tabId === 'metadataTab') {
+        const col = getCollection();
+        if (col && !document.querySelector('#metaFieldsContainer .meta-field-input')) {
+            loadMetadataFields(col);
+        }
+    }
+}
+
+document.querySelectorAll('#searchModeToggle .mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchSearchTab(btn.dataset.tab));
+});
 
 // Allow Enter to submit
 document.getElementById('semanticQuery').addEventListener('keydown', function(e) {
@@ -291,10 +587,17 @@ document.getElementById('regexPattern').addEventListener('keydown', function(e) 
     if (e.key === 'Enter') { doRegexSearch(); }
 });
 
+// Load collection metadata fields when collection changes
+document.getElementById('collectionSelect').addEventListener('change', function() {
+    loadMetadataFields(this.value);
+});
+
 // Pre-select collection from URL param
 const params = new URLSearchParams(window.location.search);
 if (params.get('collection')) {
-    document.getElementById('collectionSelect').value = params.get('collection');
+    const sel = document.getElementById('collectionSelect');
+    sel.value = params.get('collection');
+    if (sel.value) loadMetadataFields(sel.value);
 }
 </script>
 {% endblock %}

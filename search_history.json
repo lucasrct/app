@@ -1,0 +1,15 @@
+{
+  "queries": [
+    {
+      "id": "2e1e329c",
+      "query": "nicholaus61",
+      "mode": "semantic",
+      "collection": "customer_support_messages",
+      "result_count": 10,
+      "time_ms": 6.1,
+      "timestamp": "2026-06-17T18:30:31.597938",
+      "filters": {}
+    }
+  ],
+  "bookmarks": []
+}

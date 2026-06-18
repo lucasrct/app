@@ -2,7 +2,7 @@
 {% block title %}Explorer - {{ collection_name }}{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row mb-3">
     <div class="col">
         <nav aria-label="breadcrumb">
             <ol class="breadcrumb">
@@ -11,15 +11,10 @@
                 <li class="breadcrumb-item active">Explorer</li>
             </ol>
         </nav>
-        <h2><i class="bi bi-code-square me-2"></i>Chunk Explorer: {{ collection_name }}</h2>
+        <h2><i class="bi bi-code-square me-2"></i>{{ collection_name }}</h2>
         {% if stats %}
-        <p class="text-muted">{{ stats.count }} chunks across {{ stats.unique_files }} files</p>
+        <p class="text-muted mb-0">{{ stats.count }} chunks &middot; {{ stats.unique_files }} files</p>
         {% endif %}
-    </div>
-    <div class="col-auto">
-        <a href="{{ url_for('search.search_page', collection=collection_name) }}" class="btn btn-success">
-            <i class="bi bi-search me-1"></i>Search This Collection
-        </a>
     </div>
 </div>
 
@@ -27,43 +22,152 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% else %}
 
-<!-- Filters -->
-<div class="card mb-3">
-    <div class="card-body py-2">
-        <div class="row g-2 align-items-end">
-            <div class="col-md-4">
-                <label for="fpFilter" class="form-label small mb-0">File Path</label>
-                <input type="text" class="form-control form-control-sm" id="fpFilter"
-                       placeholder="e.g., services/">
-            </div>
-            <div class="col-md-3">
-                <label for="typeFilter" class="form-label small mb-0">Chunk Type</label>
-                <select class="form-select form-select-sm" id="typeFilter">
-                    <option value="">All</option>
-                    <option value="function_definition">Function</option>
-                    <option value="class_definition">Class</option>
-                    <option value="gap">Top-Level Code</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label for="symFilter" class="form-label small mb-0">Symbol</label>
-                <input type="text" class="form-control form-control-sm" id="symFilter"
-                       placeholder="e.g., SearchService">
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-sm btn-outline-light w-100" onclick="loadChunks(0)">
-                    <i class="bi bi-funnel me-1"></i>Apply
-                </button>
+<!-- Mode switcher -->
+<div class="mode-toggle mb-3" id="explorerModeTabs">
+    <button class="mode-btn active" id="browseTabBtn" data-mode="browse">
+        <i class="bi bi-list-ul me-1"></i>Browse
+    </button>
+    <button class="mode-btn" id="semanticTabBtn" data-mode="semantic">
+        <i class="bi bi-chat-dots me-1"></i>Semantic
+    </button>
+    <button class="mode-btn" id="regexTabBtn" data-mode="regex">
+        <i class="bi bi-regex me-1"></i>Regex
+    </button>
+    <button class="mode-btn" id="metadataTabBtn" data-mode="metadata">
+        <i class="bi bi-funnel me-1"></i>Metadata
+    </button>
+</div>
+
+<!-- Browse controls -->
+<div id="browsePanel">
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label for="fpFilter" class="form-label small mb-0">File Path</label>
+                    <input type="text" class="form-control form-control-sm" id="fpFilter"
+                           placeholder="e.g., services/">
+                </div>
+                <div class="col-md-3">
+                    <label for="typeFilter" class="form-label small mb-0">Chunk Type</label>
+                    <select class="form-select form-select-sm" id="typeFilter">
+                        <option value="">All</option>
+                        <option value="function_definition">Function</option>
+                        <option value="class_definition">Class</option>
+                        <option value="gap">Top-Level Code</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="symFilter" class="form-label small mb-0">Symbol</label>
+                    <input type="text" class="form-control form-control-sm" id="symFilter"
+                           placeholder="e.g., SearchService">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-sm btn-outline-light w-100" onclick="loadChunks(0)">
+                        <i class="bi bi-funnel me-1"></i>Apply
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Chunks List -->
+<!-- Semantic controls -->
+<div id="semanticPanel" class="d-none">
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-7">
+                    <label for="semanticQuery" class="form-label small mb-0">Query</label>
+                    <input type="text" class="form-control form-control-sm" id="semanticQuery"
+                           placeholder="e.g., how does the singleton pattern work?">
+                </div>
+                <div class="col-md-3">
+                    <label for="nSemantic" class="form-label small mb-0">
+                        Results: <span id="nSemanticLabel">10</span>
+                    </label>
+                    <input type="range" class="form-range" id="nSemantic" min="1" max="30" value="10"
+                           oninput="document.getElementById('nSemanticLabel').textContent=this.value">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-sm btn-semantic w-100" onclick="doSemanticSearch()">
+                        <i class="bi bi-search me-1"></i>Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Regex controls -->
+<div id="regexPanel" class="d-none">
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label for="regexPattern" class="form-label small mb-0">Pattern</label>
+                    <input type="text" class="form-control form-control-sm font-monospace" id="regexPattern"
+                           placeholder="e.g., def\s+\w+|class\s+\w+">
+                </div>
+                <div class="col-md-2">
+                    <label for="nRegex" class="form-label small mb-0">
+                        Max: <span id="nRegexLabel">30</span>
+                    </label>
+                    <input type="range" class="form-range" id="nRegex" min="5" max="100" value="30"
+                           oninput="document.getElementById('nRegexLabel').textContent=this.value">
+                </div>
+                <div class="col-md-3">
+                    <label for="regexTimeoutExp" class="form-label small mb-0">
+                        Timeout: <span id="regexTimeoutExpLabel">5</span>s
+                        <i class="bi bi-info-circle text-muted" title="How long the search runs before the app stops it. For a very broad pattern over a large codebase, consider narrowing the search instead of waiting." data-bs-toggle="tooltip"></i>
+                    </label>
+                    <input type="range" class="form-range" id="regexTimeoutExp" min="5" max="60" step="5" value="5"
+                           oninput="document.getElementById('regexTimeoutExpLabel').textContent=this.value">
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-sm btn-regex w-100" onclick="doRegexSearch()">
+                        <i class="bi bi-regex me-1"></i>Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Metadata filter controls -->
+<div id="metadataPanel" class="d-none">
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2" id="metaFieldsContainer">
+                <div class="col text-muted small fst-italic"><span class="spinner-border spinner-border-sm me-1"></span>Loading fields…</div>
+            </div>
+            <div class="row g-2 mt-2 align-items-end">
+                <div class="col-auto">
+                    <label for="nMeta" class="form-label small mb-0">
+                        Max: <span id="nMetaLabel">100</span>
+                    </label>
+                    <input type="range" class="form-range" id="nMeta" min="10" max="200" step="10" value="100"
+                           oninput="document.getElementById('nMetaLabel').textContent=this.value" style="width:120px;">
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-metadata" onclick="doMetadataSearch()">
+                        <i class="bi bi-funnel me-1"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status bar -->
+<div id="explorerStatus" class="text-muted small mb-2 d-none"></div>
+<div id="explorerError" class="alert alert-danger d-none mb-2"></div>
+
+<!-- Results -->
 <div id="chunksContainer"></div>
 
-<!-- Pagination -->
-<div class="d-flex justify-content-between align-items-center mt-3">
+<!-- Pagination (browse mode only) -->
+<div id="paginationBar" class="d-flex justify-content-between align-items-center mt-3">
     <span id="pageInfo" class="text-muted small"></span>
     <div>
         <button class="btn btn-sm btn-outline-light" id="btnPrev" onclick="prevPage()" disabled>
@@ -74,39 +178,180 @@
         </button>
     </div>
 </div>
+
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
 <script>
+const COLLECTION = {{ collection_name|tojson }};
 const PAGE_SIZE = 20;
 let currentOffset = 0;
 let totalChunks = 0;
+let currentMode = 'browse';
+
+// ── Mode switching ──────────────────────────────────────────────────────────
+
+const PANELS = { browse: 'browsePanel', semantic: 'semanticPanel', regex: 'regexPanel', metadata: 'metadataPanel' };
+
+let metadataKeysLoaded = false;
+
+document.querySelectorAll('#explorerModeTabs .mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('#explorerModeTabs .mode-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+
+        Object.values(PANELS).forEach(id => document.getElementById(id).classList.add('d-none'));
+        document.getElementById(PANELS[currentMode]).classList.remove('d-none');
+
+        document.getElementById('paginationBar').style.display = currentMode === 'browse' ? '' : 'none';
+        clearResults();
+
+        if (currentMode === 'browse') loadChunks(0);
+        if (currentMode === 'metadata' && !metadataKeysLoaded) {
+            metadataKeysLoaded = true;
+            loadMetadataKeys();
+        }
+    });
+});
+
+function clearResults() {
+    document.getElementById('chunksContainer').innerHTML = '';
+    document.getElementById('explorerStatus').classList.add('d-none');
+    document.getElementById('explorerError').classList.add('d-none');
+}
+
+function showStatus(html) {
+    const el = document.getElementById('explorerStatus');
+    el.innerHTML = html;
+    el.classList.remove('d-none');
+}
+
+function showError(msg) {
+    const el = document.getElementById('explorerError');
+    el.textContent = msg;
+    el.classList.remove('d-none');
+    document.getElementById('explorerStatus').classList.add('d-none');
+}
+
+// ── Shared helpers ──────────────────────────────────────────────────────────
+
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function typeIcon(t) {
+    return { function_definition: 'bi-braces text-info', class_definition: 'bi-diagram-3 text-warning', gap: 'bi-code-square text-secondary' }[t] || 'bi-question-circle text-muted';
+}
+
+function highlightCode(container) {
+    if (typeof hljs !== 'undefined') {
+        container.querySelectorAll('pre code[class*="language-"]:not([data-highlighted])').forEach(el => {
+            try { hljs.highlightElement(el); } catch(e) {}
+            el.dataset.highlighted = '1';
+        });
+    }
+}
+
+function getLangClass(path) {
+    const ext = (path || '').split('.').pop().toLowerCase();
+    const map = {py:'language-python', js:'language-javascript', jsx:'language-javascript',
+                 ts:'language-javascript', tsx:'language-javascript', html:'language-html',
+                 css:'language-css', sh:'language-bash', bash:'language-bash',
+                 sql:'language-sql', yaml:'language-yaml', yml:'language-yaml',
+                 json:'', jsonl:'', txt:'', text:'', csv:'', log:'', md:''};
+    if (ext in map) return map[ext];
+    return 'language-python';
+}
+
+const META_SKIP_EX = new Set(['ingested_at']);
+
+function buildExMetaPanel(metadata, uid) {
+    if (!metadata || !Object.keys(metadata).length) return '';
+    const rows = Object.entries(metadata)
+        .filter(([k, v]) => !META_SKIP_EX.has(k) && v !== null && v !== undefined && v !== '')
+        .map(([k, v]) => `
+            <tr>
+                <td class="text-muted small pe-2 text-nowrap align-top">${escapeHtml(k)}</td>
+                <td class="small font-monospace">${escapeHtml(String(v))}</td>
+                <td class="align-top ps-2">
+                    <button class="btn btn-sm p-0 border-0 text-muted" title="Filter by this"
+                            onclick="quickMetaFilter(${JSON.stringify(k)}, ${JSON.stringify(String(v))})">
+                        <i class="bi bi-funnel-fill" style="font-size:0.7rem;"></i>
+                    </button>
+                </td>
+            </tr>`).join('');
+    if (!rows) return '';
+    return `
+    <div class="chunk-meta-panel d-none" id="cmp-${uid}"
+         style="background:var(--surface);border-top:1px solid var(--border);padding:0.5rem 1rem;">
+        <table class="table table-sm table-borderless mb-0"><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+function quickMetaFilter(field, value) {
+    // Switch to metadata mode, load fields, fill the value, search
+    const btn = document.getElementById('metadataTabBtn');
+    if (btn) btn.click();
+    const tryFill = () => {
+        const inp = document.querySelector(`#metaFieldsContainer .meta-field-input[data-key="${CSS.escape(field)}"]`);
+        if (inp) { inp.value = value; doMetadataSearch(); }
+    };
+    if (!metadataKeysLoaded) {
+        metadataKeysLoaded = true;
+        loadMetadataKeys().then(tryFill);
+    } else {
+        tryFill();
+    }
+}
+
+function chunkCard(symbol, path, startLine, endLine, chunkType, code, badgeHtml, metadata) {
+    const icon = typeIcon(chunkType);
+    const langClass = getLangClass(path);
+    const uid = (path + startLine).replace(/[^a-z0-9]/gi, '_');
+    const codeBlock = langClass
+        ? `<pre class="mb-0"><code class="${langClass}">${escapeHtml(code)}</code></pre>`
+        : `<pre class="mb-0 p-3" style="white-space:pre-wrap;word-break:break-word;">${escapeHtml(code)}</pre>`;
+    const metaPanel = buildExMetaPanel(metadata, uid);
+    return `
+    <div class="card mb-2 chunk-card">
+        <div class="card-header d-flex align-items-center justify-content-between py-2 cursor-pointer"
+             onclick="const body=this.closest('.card').querySelector('.chunk-body'); body.classList.toggle('d-none'); if(!body.classList.contains('d-none')) highlightCode(this.closest('.card'));">
+            <div>
+                ${badgeHtml ? badgeHtml + ' ' : ''}
+                <i class="bi ${icon} me-1"></i>
+                <strong>${escapeHtml(symbol)}</strong>
+                <span class="text-muted ms-2 small font-monospace">${escapeHtml(path)}</span>
+                <span class="badge bg-dark ms-2">L${startLine}-L${endLine}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2" onclick="event.stopPropagation();">
+                ${metaPanel ? `<button class="btn btn-sm p-0 border-0 text-muted" title="Show metadata"
+                        onclick="document.getElementById('cmp-${uid}').classList.toggle('d-none')">
+                    <i class="bi bi-info-circle"></i></button>` : ''}
+                <i class="bi bi-chevron-down text-muted small"></i>
+            </div>
+        </div>
+        <div class="card-body p-0 d-none chunk-body">
+            ${codeBlock}
+        </div>
+        ${metaPanel}
+    </div>`;
+}
+
+// ── Browse mode ─────────────────────────────────────────────────────────────
 
 function getFilterParams() {
-    const params = new URLSearchParams();
+    const p = new URLSearchParams();
     const fp = document.getElementById('fpFilter').value.trim();
     const tp = document.getElementById('typeFilter').value;
     const sym = document.getElementById('symFilter').value.trim();
-    if (fp) params.set('path', fp);
-    if (tp) params.set('type', tp);
-    if (sym) params.set('symbol', sym);
-    return params;
-}
-
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
-
-function typeIcon(chunkType) {
-    const icons = {
-        'function_definition': 'bi-braces text-info',
-        'class_definition': 'bi-diagram-3 text-warning',
-        'gap': 'bi-code-square text-secondary',
-    };
-    return icons[chunkType] || 'bi-question-circle text-muted';
+    if (fp) p.set('path', fp);
+    if (tp) p.set('type', tp);
+    if (sym) p.set('symbol', sym);
+    return p;
 }
 
 async function loadChunks(offset) {
@@ -119,47 +364,22 @@ async function loadChunks(offset) {
     container.innerHTML = '<div class="text-center py-3"><span class="spinner-border"></span></div>';
 
     try {
-        const resp = await fetch(`${BASE_URL}/api/explorer/{{ collection_name }}/chunks?${params}`);
+        const resp = await fetch(`${BASE_URL}/api/explorer/${COLLECTION}/chunks?${params}`);
         const data = await resp.json();
         totalChunks = data.total;
 
         if (data.chunks.length === 0) {
             container.innerHTML = '<div class="text-center py-4 text-muted">No chunks match your filters.</div>';
         } else {
-            let html = '';
-            for (const chunk of data.chunks) {
-                const meta = chunk.metadata;
-                const symbol = meta.symbol || 'Top-Level Code';
-                const icon = typeIcon(meta.chunk_type);
-                const idShort = chunk.id.substring(0, 8);
-
-                html += `
-                <div class="card mb-2 chunk-card">
-                    <div class="card-header d-flex align-items-center justify-content-between py-2 cursor-pointer"
-                         onclick="this.nextElementSibling.classList.toggle('d-none');
-                                  if (typeof hljs !== 'undefined') { this.closest('.card').querySelectorAll('pre code').forEach(el => {
-                                      if (!el.dataset.highlighted) { try { hljs.highlightElement(el); } catch(e) {} el.dataset.highlighted='1'; }
-                                  }); }">
-                        <div>
-                            <i class="bi ${icon} me-1"></i>
-                            <strong>${escapeHtml(symbol)}</strong>
-                            <span class="text-muted ms-2 small font-monospace">${escapeHtml(meta.path)}</span>
-                            <span class="badge bg-dark ms-2">L${meta.start_line}-L${meta.end_line}</span>
-                        </div>
-                        <span class="text-muted small">${idShort}...</span>
-                    </div>
-                    <div class="card-body p-0 d-none">
-                        <pre class="mb-0"><code class="language-python">${escapeHtml(chunk.document)}</code></pre>
-                    </div>
-                </div>`;
-            }
-            container.innerHTML = html;
+            container.innerHTML = data.chunks.map(c => {
+                const m = c.metadata;
+                return chunkCard(m.symbol || 'Top-Level Code', m.path, m.start_line, m.end_line, m.chunk_type, c.document, '', c.metadata);
+            }).join('');
         }
 
-        // Update pagination
         const from = offset + 1;
         const to = Math.min(offset + data.chunks.length, totalChunks);
-        document.getElementById('pageInfo').textContent = `Showing ${from}-${to} of ${totalChunks}`;
+        document.getElementById('pageInfo').textContent = `Showing ${from}–${to} of ${totalChunks}`;
         document.getElementById('btnPrev').disabled = offset === 0;
         document.getElementById('btnNext').disabled = offset + PAGE_SIZE >= totalChunks;
 
@@ -171,7 +391,160 @@ async function loadChunks(offset) {
 function prevPage() { loadChunks(Math.max(0, currentOffset - PAGE_SIZE)); }
 function nextPage() { loadChunks(currentOffset + PAGE_SIZE); }
 
-// Load initial page
+// ── Semantic search ─────────────────────────────────────────────────────────
+
+async function doSemanticSearch() {
+    const query = document.getElementById('semanticQuery').value.trim();
+    if (!query) { showError('Enter a query.'); return; }
+
+    const n = parseInt(document.getElementById('nSemantic').value);
+    showStatus('<span class="spinner-border spinner-border-sm me-2"></span>Searching…');
+    document.getElementById('explorerError').classList.add('d-none');
+    document.getElementById('chunksContainer').innerHTML = '';
+
+    try {
+        const resp = await fetch(`${BASE_URL}/api/search/semantic`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ query, collection: COLLECTION, n_results: n, filters: {} }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error);
+
+        showStatus(`<span class="text-success fw-bold">${data.total} results</span> in ${data.time_ms}ms for "<em>${escapeHtml(query)}</em>"`);
+
+        if (data.results.length === 0) {
+            document.getElementById('chunksContainer').innerHTML = '<div class="text-center py-4 text-muted">No results.</div>';
+            return;
+        }
+
+        document.getElementById('chunksContainer').innerHTML = data.results.map(r => {
+            const pct = r.score_percentage.toFixed(1);
+            let cls = pct >= 80 ? 'bg-success' : pct >= 60 ? 'bg-info' : pct >= 40 ? 'bg-warning' : 'bg-secondary';
+            const badge = `<span class="badge ${cls}">${pct}%</span>`;
+            return chunkCard(r.symbol || 'Top-Level Code', r.path, r.lines.replace(/L(\d+)-L(\d+)/, '$1'), r.lines.replace(/L(\d+)-L(\d+)/, '$2'), r.chunk_type, r.code, badge, r.metadata);
+        }).join('');
+
+    } catch (err) { showError(err.message); }
+}
+
+// ── Regex search ────────────────────────────────────────────────────────────
+
+async function doRegexSearch() {
+    const pattern = document.getElementById('regexPattern').value.trim();
+    if (!pattern) { showError('Enter a regex pattern.'); return; }
+
+    const n = parseInt(document.getElementById('nRegex').value);
+    const timeoutS = parseInt(document.getElementById('regexTimeoutExp').value);
+    showStatus('<span class="spinner-border spinner-border-sm me-2"></span>Searching…');
+    document.getElementById('explorerError').classList.add('d-none');
+    document.getElementById('chunksContainer').innerHTML = '';
+
+    try {
+        const resp = await fetch(`${BASE_URL}/api/search/regex`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ pattern, collection: COLLECTION, n_results: n, timeout_seconds: timeoutS }),
+        });
+        const data = await resp.json();
+        if (resp.status === 408) { showError(data.message); return; }
+        if (!resp.ok) throw new Error(data.error);
+
+        showStatus(`<span class="text-warning fw-bold">${data.total} matches</span> in ${data.time_ms}ms for <code>${escapeHtml(pattern)}</code>`);
+
+        if (data.results.length === 0) {
+            document.getElementById('chunksContainer').innerHTML = '<div class="text-center py-4 text-muted">No matches.</div>';
+            return;
+        }
+
+        document.getElementById('chunksContainer').innerHTML = data.results.map(r => {
+            const highlights = (r.highlights || []).map(h => `<code class="me-1" style="background:#2d2d2d;padding:1px 4px;border-radius:3px">${escapeHtml(h)}</code>`).join('');
+            const badge = highlights ? `<span class="me-1">${highlights}</span>` : '';
+            return chunkCard(r.symbol || 'Top-Level Code', r.path, r.lines.replace(/L(\d+)-L(\d+)/, '$1'), r.lines.replace(/L(\d+)-L(\d+)/, '$2'), r.chunk_type, r.code, badge, r.metadata);
+        }).join('');
+
+    } catch (err) { showError(err.message); }
+}
+
+// ── Metadata search ─────────────────────────────────────────────────────────
+
+async function loadMetadataKeys() {
+    try {
+        const resp = await fetch(`${BASE_URL}/api/collections/${encodeURIComponent(COLLECTION)}/metadata_keys`);
+        const data = await resp.json();
+        const container = document.getElementById('metaFieldsContainer');
+        if (!resp.ok || !data.keys || data.keys.length === 0) {
+            container.innerHTML = '<div class="col text-muted small fst-italic">No metadata fields found.</div>';
+            return;
+        }
+        const substrFields = new Set(['path', 'symbol']);
+        container.innerHTML = data.keys.map(k => {
+            const hint = substrFields.has(k) ? 'substring' : 'exact';
+            return `<div class="col-md-3 col-sm-6">
+                <label class="form-label small mb-0">${escapeHtml(k)} <span class="text-muted">(${hint})</span></label>
+                <input type="text" class="form-control form-control-sm meta-field-input"
+                       data-key="${escapeHtml(k)}" placeholder="${escapeHtml(k)}">
+            </div>`;
+        }).join('');
+    } catch (err) {
+        document.getElementById('metaFieldsContainer').innerHTML = '<div class="col text-danger small">Failed to load fields.</div>';
+    }
+}
+
+async function doMetadataSearch() {
+    const filters = {};
+    document.querySelectorAll('#metaFieldsContainer .meta-field-input').forEach(input => {
+        const val = input.value.trim();
+        if (val) filters[input.dataset.key] = val;
+    });
+
+    if (Object.keys(filters).length === 0) { showError('Enter at least one filter.'); return; }
+
+    const n = parseInt(document.getElementById('nMeta').value);
+    showStatus('<span class="spinner-border spinner-border-sm me-2"></span>Filtering…');
+    document.getElementById('explorerError').classList.add('d-none');
+    document.getElementById('chunksContainer').innerHTML = '';
+
+    try {
+        const resp = await fetch(`${BASE_URL}/api/search/metadata`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ collection: COLLECTION, filters, n_results: n }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error);
+
+        const substrFields = new Set(['path', 'symbol']);
+        const parts = Object.entries(filters).map(([k, v]) =>
+            substrFields.has(k) ? `${escapeHtml(k)} ⊇ <code>${escapeHtml(v)}</code>`
+                                : `${escapeHtml(k)} = <code>${escapeHtml(v)}</code>`
+        );
+        showStatus(`<span class="text-info fw-bold">${data.total} chunks</span> in ${data.time_ms}ms &mdash; ${parts.join(' &amp; ')}`);
+
+        if (data.results.length === 0) {
+            document.getElementById('chunksContainer').innerHTML = '<div class="text-center py-4 text-muted">No chunks matched.</div>';
+            return;
+        }
+
+        document.getElementById('chunksContainer').innerHTML = data.results.map(r => {
+            const typeLabel = { function_definition: 'fn', class_definition: 'class', gap: 'module', json_record: 'json' }[r.chunk_type] || r.chunk_type;
+            const badge = `<span class="badge bg-secondary">${escapeHtml(typeLabel)}</span>`;
+            return chunkCard(r.symbol || 'Record', r.path, r.lines.replace(/L(\d+)-L(\d+)/, '$1'), r.lines.replace(/L(\d+)-L(\d+)/, '$2'), r.chunk_type, r.code, badge, r.metadata);
+        }).join('');
+
+    } catch (err) { showError(err.message); }
+}
+
+// ── Enter key shortcuts ─────────────────────────────────────────────────────
+
+document.getElementById('semanticQuery').addEventListener('keydown', e => { if (e.key === 'Enter') doSemanticSearch(); });
+document.getElementById('regexPattern').addEventListener('keydown', e => { if (e.key === 'Enter') doRegexSearch(); });
+document.getElementById('metaFieldsContainer').addEventListener('keydown', e => { if (e.key === 'Enter') doMetadataSearch(); });
+document.getElementById('fpFilter').addEventListener('keydown',   e => { if (e.key === 'Enter') loadChunks(0); });
+document.getElementById('symFilter').addEventListener('keydown',  e => { if (e.key === 'Enter') loadChunks(0); });
+
+// ── Init ────────────────────────────────────────────────────────────────────
+
 loadChunks(0);
 </script>
 {% endblock %}

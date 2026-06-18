@@ -109,6 +109,7 @@ class Chunk:
     metadata: ChunkMetadata = field(default_factory=lambda: ChunkMetadata(
         path="unknown", start_line=0, end_line=0
     ))
+    raw_metadata: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def token_estimate(self) -> int:
@@ -143,4 +144,5 @@ class Chunk:
             id=id,
             document=document,
             metadata=ChunkMetadata.from_dict(metadata),
+            raw_metadata=metadata,
         )

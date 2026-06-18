@@ -36,6 +36,8 @@ class CollectionStats:
     unique_symbols: int = 0
     chunk_types: Dict[str, int] = field(default_factory=dict)
     file_list: List[str] = field(default_factory=list)
+    embedding_provider: str = "openai"
+    embedding_model: str = "text-embedding-3-small"
 
     @property
     def is_empty(self) -> bool:
@@ -102,6 +104,7 @@ class CollectionService:
             ct = meta.get("chunk_type", "unknown")
             chunk_types[ct] = chunk_types.get(ct, 0) + 1
 
+        embedding_info = self._manager.get_collection_embedding_info(name)
         return CollectionStats(
             name=name,
             count=count,
@@ -109,13 +112,20 @@ class CollectionService:
             unique_symbols=len(symbols),
             chunk_types=chunk_types,
             file_list=sorted(paths),
+            embedding_provider=embedding_info["embedding_provider"],
+            embedding_model=embedding_info["embedding_model"],
         )
 
     @log_operation("create_collection")
-    def create_collection(self, name: str) -> bool:
-        """Create a new empty collection."""
+    def create_collection(
+        self,
+        name: str,
+        embedding_provider: str = "openai",
+        embedding_model: str = "text-embedding-3-small",
+    ) -> bool:
+        """Create a new empty collection with the specified embedding model."""
         try:
-            self._manager.get_collection(name)
+            self._manager.get_collection(name, provider=embedding_provider, model_name=embedding_model)
             return True
         except Exception as e:
             logger.error(f"Failed to create collection: {e}")

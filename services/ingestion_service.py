@@ -422,6 +422,107 @@ class IngestionService:
         return sorted(files)
 
     @staticmethod
+    def _load_records(file_path: str) -> List[dict]:
+        """Load records from a JSONL file (one object per line) or a JSON array."""
+        import json as _json
+        with open(file_path, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        if not content:
+            raise ValueError("File is empty")
+        if content.startswith("["):
+            records = _json.loads(content)
+            if not isinstance(records, list):
+                raise ValueError("JSON file must contain a top-level array of objects")
+            return records
+        # JSONL: one JSON object per line
+        records = []
+        for lineno, line in enumerate(content.splitlines(), 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = _json.loads(line)
+            except _json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON on line {lineno}: {e}") from e
+            if not isinstance(obj, dict):
+                raise ValueError(f"Line {lineno} is not a JSON object")
+            records.append(obj)
+        return records
+
+    def ingest_json_file(
+        self,
+        file_path: str,
+        collection_name: str,
+        text_field: str = "text",
+        id_field: Optional[str] = None,
+        metadata_fields: Optional[List[str]] = None,
+    ) -> dict:
+        """Ingest records from a JSONL or JSON array file into a ChromaDB collection.
+
+        Each record's text_field becomes the document; all other fields are
+        stored as ChromaDB metadata. The source filename is stored as 'path'
+        so the collection viewer's file-count stats work correctly.
+        """
+        records = self._load_records(file_path)
+
+        collection = self._chroma.get_existing_collection(collection_name)
+        if collection is None:
+            raise ValueError(f"Collection '{collection_name}' not found")
+
+        source_filename = os.path.basename(file_path)
+        now_str = datetime.now().isoformat()
+        batch_size = self._config.batch_size
+
+        ids: List[str] = []
+        documents: List[str] = []
+        metadatas: List[dict] = []
+        total = 0
+        failed = 0
+
+        for record in records:
+            if not isinstance(record, dict):
+                failed += 1
+                continue
+
+            text = record.get(text_field)
+            if not text or not str(text).strip():
+                failed += 1
+                continue
+
+            if id_field and id_field in record and record[id_field]:
+                record_id = str(record[id_field])
+            else:
+                record_id = str(uuid.uuid4())
+
+            meta: dict = {
+                "path": source_filename,
+                "chunk_type": "json_record",
+                "ingested_at": now_str,
+            }
+            for k, v in record.items():
+                if k == text_field:
+                    continue
+                if metadata_fields is not None and k not in metadata_fields:
+                    continue
+                meta[k] = str(v) if v is not None else ""
+
+            ids.append(record_id)
+            documents.append(str(text))
+            metadatas.append(meta)
+
+            if len(ids) >= batch_size:
+                collection.add(ids=ids, documents=documents, metadatas=metadatas)
+                total += len(ids)
+                ids, documents, metadatas = [], [], []
+
+        if ids:
+            collection.add(ids=ids, documents=documents, metadatas=metadatas)
+            total += len(ids)
+
+        logger.info(f"JSON ingestion complete: {total} records from '{source_filename}'")
+        return {"total_ingested": total, "failed": failed, "source": source_filename}
+
+    @staticmethod
     def _upload_batch(collection, chunks: List[Chunk]) -> None:
         """Upload a batch of Chunk objects to ChromaDB."""
         if not chunks:

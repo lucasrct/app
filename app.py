@@ -56,10 +56,15 @@ def create_app() -> Flask:
     # Register all route blueprints
     register_blueprints(app)
 
-    # Error handlers
+    # Error handlers — these apply in production; in debug mode, wrap route
+    # bodies in try/except to prevent Werkzeug from bypassing these handlers.
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({"error": "Not found"}), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(error):
+        return jsonify({"error": "Method not allowed"}), 405
 
     @app.errorhandler(500)
     def internal_error(error):

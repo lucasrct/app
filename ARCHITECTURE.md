@@ -42,7 +42,7 @@ Collections are created with the embedding function attached, so ChromaDB automa
 
 Two strategies are available and share the `SearchStrategy` abstract base class:
 
-**`SemanticSearchStrategy`** uses `collection.query()` with `query_texts`. The distance metric is cosine similarity (ChromaDB's default for OpenAI embedding functions). Results are ranked by distance ascending, so lower scores mean higher similarity.
+**`SemanticSearchStrategy`** uses `collection.query()` with `query_texts`. The distance metric is L2 (Euclidean) distance, which is ChromaDB's default index space since the collection is created without an `hnsw:space` override. Results are ranked by distance ascending, so lower scores mean higher similarity.
 
 **`RegexSearchStrategy`** uses `collection.get()` with a `where_document={"$regex": pattern}` filter. ChromaDB evaluates the regex server-side, which avoids pulling all documents into Python memory. The strategy then computes a match-count score client-side and sorts by it.
 

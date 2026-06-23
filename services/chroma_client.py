@@ -88,9 +88,15 @@ class ChromaClientManager:
             # First call — no EF needed, just to read stored metadata
             raw = self._client.get_collection(name)
             meta = raw.metadata or {}
-            provider = meta.get("embedding_provider", DEFAULT_PROVIDER)
-            model_name = meta.get("embedding_model", DEFAULT_MODEL)
-            ef = self.get_embedding_function(provider, model_name)
+            provider = meta.get("embedding_provider")
+            model_name = meta.get("embedding_model")
+            if provider and model_name:
+                ef = self.get_embedding_function(provider, model_name)
+            else:
+                # Collection was created without explicit embedding metadata
+                # (e.g. via DefaultEmbeddingFunction in helper_utils) — use the same default
+                from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
+                ef = DefaultEmbeddingFunction()
             # Second call — with the right EF attached
             return self._client.get_collection(name, embedding_function=ef)
         except Exception:
@@ -148,3 +154,4 @@ def require_collection(f: Callable) -> Callable:
         kwargs["collection"] = collection
         return f(*args, **kwargs)
     return wrapper
+
